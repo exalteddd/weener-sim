@@ -511,7 +511,7 @@
         <div>
           <div class="field-top"><span>Grid size</span></div>
           <div class="seg" id="sizeSeg" role="radiogroup" aria-label="Grid size">
-            <button role="radio" data-n="5">5×5</button><button role="radio" data-n="7">7×7</button><button role="radio" data-n="9">9×9</button>
+            <button role="radio" data-n="5">5×5</button><button role="radio" data-n="7">7×7</button><button role="radio" data-n="9">9×9</button><button role="radio" data-n="11">11×11</button><button role="radio" data-n="13">13×13</button>
           </div>
         </div>
         <div>
@@ -768,7 +768,72 @@ function grow(vecs, days) {
   return { arrival, counts, side, R, days, order: queue };
 }
 
-// Runs grow() in a Web Worker so the page never stalls; falls back to the main thread
+// Grow day by day and stop as soon as the counts have settled, instead of a fixed number of days.
+// The grid covers only cap·bbox (bbox of {0} ∪ vecs), not a square of side 2·cap·r, and grows (×2, cells
+// remapped) if more days are needed. Each cell is visited once; the inner loop needs no bounds checks because
+// a cell reached by day d lies in d·bbox.
+//   o.minDays  simulate at least this many days (the preview)
+//   o.maxCells memory budget for the grid
+//   o.a2       erea / prick: the settled second difference, exact
+//   o.b2       2b from the edge tables, exact (null if unknown)
+//   o.plateau  how many days the second difference must stay settled
+function growFast(vecs, o) {
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0;
+  for (const [x, y] of vecs) { if (x < b0) b0 = x; if (x > b1) b1 = x; if (y < b2) b2 = y; if (y > b3) b3 = y; }
+  const bw = b1 - b0, bh = b3 - b2, k = vecs.length;
+  const cellsFor = c => (c * bw + 1) * (c * bh + 1);
+  let maxDays = Math.min(o.maxDays || 4000, 65000);
+  while (maxDays > 8 && cellsFor(maxDays) > o.maxCells) maxDays = Math.floor(maxDays * 0.9);
+  const minDays = Math.min(o.minDays, maxDays);
+  let cap = Math.min(maxDays, Math.max(minDays, o.firstCap || 48));
+  let W = 0, X0 = 0, Y1 = 0, arrival = null, queue = null;
+  const offs = new Int32Array(k);
+  function layout(c) {
+    const nW = c * bw + 1, nH = c * bh + 1, nX0 = c * b0, nY1 = c * b3, size = nW * nH;
+    const na = new Uint16Array(size).fill(65535), nq = new Int32Array(size);
+    if (arrival) {
+      for (let i = 0; i < tail; i++) {
+        const q = queue[i], row = (q / W) | 0, x = q - row * W + X0, y = Y1 - row;
+        const p = (nY1 - y) * nW + (x - nX0);
+        na[p] = arrival[q]; nq[i] = p;
+      }
+    }
+    arrival = na; queue = nq; W = nW; X0 = nX0; Y1 = nY1; cap = c;
+    for (let i = 0; i < k; i++) offs[i] = vecs[i][0] - vecs[i][1] * W;
+  }
+  let tail = 0;
+  layout(cap);
+  const origin = Y1 * W - X0;
+  arrival[origin] = 0; queue[0] = origin; tail = 1;
+  const counts = [1];
+  let head = 0, d = 0, stopped = false, n0 = 0, run = 0, last = NaN;
+  const plateau = o.plateau || 12;
+  while (true) {
+    if (d === cap) { if (cap >= maxDays) break; layout(Math.min(maxDays, cap * 2)); }
+    d++;
+    const end = tail;
+    while (head < end) {
+      const p = queue[head++];
+      for (let j = 0; j < k; j++) {
+        const q = p + offs[j];
+        if (arrival[q] === 65535) { arrival[q] = d; queue[tail++] = q; }
+      }
+    }
+    counts.push(tail);
+    if (d >= 2) {
+      const s = counts[d] - 2 * counts[d - 1] + counts[d - 2];
+      if (s === last) run++; else { last = s; run = 1; n0 = d - 2; }
+      // settled: second difference = erea/prick for `plateau` days running, and (when known) b matches the edges
+      if (d >= minDays && run >= plateau && run >= Math.ceil(n0 / 2) && s === o.a2) {
+        const B2 = 2 * (counts[n0 + 1] - counts[n0]) - s * (2 * n0 + 1);
+        if (o.b2 == null || B2 === o.b2) { stopped = true; break; }
+      }
+    }
+  }
+  return { arrival, counts: Int32Array.from(counts), W, X0, Y1, H: arrival.length / W, days: d, order: queue, stopped };
+}
+
+// Runs growFast() in a Web Worker so the page never stalls; falls back to the main thread
 // if workers are unavailable. Only the newest request is delivered: while the worker is
 // busy, newer requests replace each other in a one-slot queue.
 const Runner = (() => {
@@ -776,17 +841,17 @@ const Runner = (() => {
   function local(job) {
     setTimeout(() => {
       const t0 = performance.now();
-      const res = grow(job.vecs, job.days);
+      const res = growFast(job.vecs, job.opts);
       res.ms = performance.now() - t0;
       if (job.id === seq) onGrowth(job, res);
     }, 0);
   }
-  function send(job) { current = job; busy = true; worker.postMessage({ id: job.id, vecs: job.vecs, days: job.days }); }
+  function send(job) { current = job; busy = true; worker.postMessage({ id: job.id, vecs: job.vecs, opts: job.opts }); }
   try {
-    const src = `'use strict';${grow.toString()}
+    const src = `'use strict';${growFast.toString()}
 self.onmessage = e => {
-  const { id, vecs, days } = e.data, t0 = performance.now();
-  const res = grow(vecs, days);
+  const { id, vecs, opts } = e.data, t0 = performance.now();
+  const res = growFast(vecs, opts);
   res.ms = performance.now() - t0; res.id = id; res.order = null;
   self.postMessage(res, [res.arrival.buffer, res.counts.buffer]);
 };`;
@@ -1030,7 +1095,7 @@ function makeRenderer(theme) {
 
   // tick numbers along the axes; left out where they would sit on weeds, pinned to an edge when an axis is off screen
   function drawLabels(ctx, W, H, ox, oy, cp, step, sim, n) {
-    const grown = (x, y) => sim && Math.abs(x) <= sim.R && Math.abs(y) <= sim.R && sim.arrival[(sim.R - y) * sim.side + x + sim.R] <= n;
+    const grown = (x, y) => sim && x >= sim.X0 && x < sim.X0 + sim.W && y <= sim.Y1 && y > sim.Y1 - sim.H && sim.arrival[(sim.Y1 - y) * sim.W + x - sim.X0] <= n;
     ctx.font = '500 11px "DM Mono", ui-monospace, monospace';
     ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = T.bg; ctx.fillStyle = T.label;
     ctx.textBaseline = 'middle';
@@ -1051,12 +1116,12 @@ function makeRenderer(theme) {
   }
 
   function drawCells(ctx, sim, x0, x1, y0, y1, n, di, frac, p, ox, oy, cp) {
-    const { arrival, side, R } = sim;
+    const { arrival, W: gw, X0: gx, Y1: gy } = sim;
     const big = cp >= 6, pad = big ? Math.max(1, cp * 0.08) : cp * 0.12, s = cp - 2 * pad, hs = s / 2, rad = Math.min(cp * 0.16, 6);
     const round = big && hasRoundRect;
     const paths = new Array(n + 1);
     for (let y = y1; y >= y0; y--) {
-      let idx = (R - y) * side + (x0 + R);
+      let idx = (gy - y) * gw + (x0 - gx);
       const top = oy - y * cp - hs;
       for (let x = x0; x <= x1; x++, idx++) {
         const a = arrival[idx];
@@ -1075,13 +1140,13 @@ function makeRenderer(theme) {
   }
 
   function drawNumbers(ctx, sim, x0, x1, y0, y1, n, di, frac, p, ox, oy, cp, dpr, maxDay) {
-    const { arrival, side, R } = sim;
+    const { arrival, W: gw, X0: gx, Y1: gy } = sim;
     const sh = numberSheet(Math.round(clamp(cp * 0.36, 9, 18)), dpr, maxDay);
     const dw = sh.cw / dpr, dh = sh.ch / dpr, dark = new Uint8Array(n + 1);
     for (let k = 0; k <= n; k++) dark[k] = LUT_DARK[lutIndex(k, p)];
     let alpha = 1; ctx.globalAlpha = 1;
     for (let y = y1; y >= y0; y--) {
-      let idx = (R - y) * side + (x0 + R);
+      let idx = (gy - y) * gw + (x0 - gx);
       const ty = Math.round((oy - y * cp) * dpr - sh.ch / 2) / dpr;
       for (let x = x0; x <= x1; x++, idx++) {
         const a = arrival[idx];
@@ -1097,7 +1162,7 @@ function makeRenderer(theme) {
 
   // far zoom: paint the day-n extent into a small bitmap once per day position, then scale it
   function drawBitmap(ctx, sim, n, di, frac, p, ox, oy, cp) {
-    const { arrival, side, R, bbox: bb } = sim;
+    const { arrival, W: gw, X0: gx, Y1: gy, bbox: bb } = sim;
     const X0 = n * bb[0], X1 = n * bb[1], Y0 = n * bb[2], Y1 = n * bb[3];
     const bw = X1 - X0 + 1, bh = Y1 - Y0 + 1, key = sim.id + '|' + p;
     if (key !== bmKey) {
@@ -1114,7 +1179,7 @@ function makeRenderer(theme) {
       }
       let o = 0;
       for (let y = Y1; y >= Y0; y--) {
-        let idx = (R - y) * side + (X0 + R);
+        let idx = (gy - y) * gw + (X0 - gx);
         for (let x = 0; x < bw; x++, idx++, o++) { const a = arrival[idx]; if (a <= n) px[o] = cols[a]; }
       }
       bmCtx.putImageData(bmImg, 0, 0);
@@ -1130,7 +1195,7 @@ function makeRenderer(theme) {
 function simFromGrowth(vecs, res, id) {
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0;
   for (const [x, y] of vecs) { b0 = Math.min(b0, x); b1 = Math.max(b1, x); b2 = Math.min(b2, y); b3 = Math.max(b3, y); }
-  return { arrival: res.arrival, counts: res.counts, side: res.side, R: res.R, days: res.days, bbox: [b0, b1, b2, b3], id };
+  return { arrival: res.arrival, counts: res.counts, W: res.W, H: res.H, X0: res.X0, Y1: res.Y1, days: res.days, bbox: [b0, b1, b2, b3], id };
 }
 
 // ── Settings & pattern state ──────────────────────────────────────────────
@@ -1138,7 +1203,7 @@ const S = Object.assign({ count: 3, any: false, previewDays: 30, rings: true }, 
 const saveSettings = () => store.set('wsim:settings', S);
 const DEFAULT_PATTERN = ['-2,2', '-1,2', '0,2', '1,2', '2,2', '-2,1', '1,-1', '2,-2'];   // 11111,10000,00W00,00010,00001
 const P = {
-  n: [5, 7, 9].includes(store.get('wsim:n', 5)) ? store.get('wsim:n', 5) : 5,
+  n: [5, 7, 9, 11, 13].includes(store.get('wsim:n', 5)) ? store.get('wsim:n', 5) : 5,
   on: new Set(store.get('wsim:pattern', DEFAULT_PATTERN)),
 };
 const keyOf = (x, y) => x + ',' + y;
@@ -1150,6 +1215,8 @@ const SIZES = {
   5: { gap: '4px', cr: '11px', fs: '11px', dot: '14px', max: '344px' },
   7: { gap: '3px', cr: '9px', fs: '9.5px', dot: '11px', max: '364px' },
   9: { gap: '2.5px', cr: '7px', fs: '8px', dot: '8px', max: '384px' },
+  11: { gap: '2px', cr: '6px', fs: '6.5px', dot: '7px', max: '404px' },
+  13: { gap: '1.5px', cr: '5px', fs: '5.5px', dot: '6px', max: '424px' },
 };
 const pgrid = $('pgrid');
 let cellEls = new Map();
@@ -1385,10 +1452,10 @@ function edgeData(vecs) {
   return edges;
 }
 const linHTML = (m, c) => { const t = (m ? `${m === 1 ? '' : m}<i>n</i>` : '') + (c ? `${m ? (c < 0 ? ' − ' : ' + ') : (c < 0 ? '−' : '')}${Math.abs(c)}` : ''); return t || '0'; };
-function renderEdges(vecs, A) {
+function renderEdges(vecs, A, E) {
   const tbl = $('edgesTbl'), st = $('edgesStatus');
   if (!tbl) return;
-  const E = vecs.length ? edgeData(vecs) : null;
+  if (E === undefined) E = vecs.length ? edgeData(vecs) : null;
   if (!E) { tbl.innerHTML = `<tbody><tr><td class="muted">Needs a pattern that isn't on one line.</td></tr></tbody>`; st.textContent = ''; return; }
   const pt = ([x, y]) => `(${x},${y})`;
   const coinTxt = c => c.gens[0] === 1 ? '⟨1⟩, no gaps' : `⟨${c.gens.join(',')}⟩ F=${c.F}, ${c.gaps} gap${c.gaps === 1 ? '' : 's'}`;
@@ -1405,31 +1472,30 @@ function renderEdges(vecs, A) {
 }
 
 // ── Running & results ─────────────────────────────────────────────────────
-const MAX_DAYS = 256;
+const MAX_CELLS = 16e6;            // grid budget for one run (about 100 MB at the peak)
 let lastAnalysis = null;
 
+// The growth runs until the counts settle. a and b are known exactly beforehand (a from the area, b from the
+// edge tables), so the run stops once the second difference has equalled 2a for 12 days (and for at least half
+// the days before it settled) and b agrees; that is checked against long runs on thousands of patterns.
 function runAnalysis() {
   clearTimeout(runTimer);
   const vecs = getVecs();
-  let r = 1;
-  for (const [x, y] of vecs) r = Math.max(r, Math.abs(x), Math.abs(y));
-  // enough days to see most patterns settle; onGrowth doubles it (up to MAX_DAYS) if they haven't
-  const days = Math.max(32 + 16 * r, S.previewDays);
+  const E = vecs.length ? edgeData(vecs) : null;
+  const erea = area2(hull([[0, 0], ...vecs]));
+  let prick = 0;
+  for (let i = 0; i < vecs.length; i++)
+    for (let j = i + 1; j < vecs.length; j++) prick = gcd(prick, vecs[i][0] * vecs[j][1] - vecs[i][1] * vecs[j][0]);
+  const b2 = E && !E.some(e => e.capped) ? E.reduce((s, e) => s + e.b2, 0) : null;
   $('resStatus').textContent = 'Running…';
-  Runner.submit({ vecs, days });
+  Runner.submit({ vecs, E, opts: { minDays: S.previewDays, maxCells: MAX_CELLS, a2: prick ? erea / prick : 0, b2, plateau: 12 } });
 }
 
 function onGrowth(job, res) {
   const A = analyse(job.vecs, res.counts);
-  if (!A.stable && job.days < MAX_DAYS) {
-    const days = Math.min(MAX_DAYS, job.days * 2);
-    $('resStatus').textContent = `Still settling — simulating ${days} days…`;
-    Runner.submit({ vecs: job.vecs, days });
-    return;
-  }
   lastAnalysis = A;
   renderResults(A, res.ms);
-  renderEdges(job.vecs, A);
+  renderEdges(job.vecs, A, job.E);
   Preview.setSim(job.vecs, res);
   Research.run(job.vecs);
 }
@@ -1973,7 +2039,7 @@ function parsePattern(raw) {
   pts = pts.filter(([x, y]) => x || y);
   if (!pts.length) return { error: 'No directions found (the centre W does not count).' };
   const m = Math.max(...pts.map(([x, y]) => Math.max(Math.abs(x), Math.abs(y))));
-  if (m > 4) return { error: `Directions must be within 4 steps of W (largest here is ${m}).` };
+  if (m > 6) return { error: `Directions must be within 6 steps of W (largest here is ${m}).` };
   return { pts, m };
 }
 
@@ -2114,7 +2180,7 @@ const Library = (() => {
       name: f.name.slice(0, 60),
       items: f.items.filter(it => it && Array.isArray(it.offsets)).map(it => ({
         name: String(it.name ?? 'untitled').slice(0, 60),
-        offsets: it.offsets.filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && Math.abs(p[0]) <= 4 && Math.abs(p[1]) <= 4).map(p => [p[0], p[1]]),
+        offsets: it.offsets.filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && Math.abs(p[0]) <= 6 && Math.abs(p[1]) <= 6).map(p => [p[0], p[1]]),
       })),
     }));
   }
