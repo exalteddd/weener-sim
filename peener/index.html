@@ -1,0 +1,1249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8">
+<title>Peener Sim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Courier+Prime&display=swap" rel="stylesheet">
+<style>
+/* One screen on paper: ruled sections, serif type, a pointillist speckle round the edges, the painting dissolving into dots. */
+:root {
+  --paper: #f7efe1; --ink: #2a2520; --ink-2: #6f6455; --rule: #d6c9b2; --rule-2: #e6dccb;
+  --red: #c9483a; --red-deep: #ad3a2e; --lav: #e4dbe9; --lav-2: #d4c8de; --violet: #8a78b3; --field: #fbf6ec;
+  --serif: 'EB Garamond', Garamond, Georgia, 'Times New Roman', serif;
+  --mono: 'Courier Prime', 'Courier New', ui-monospace, monospace;
+  color-scheme: light;
+}
+html { height: 100%; }
+body { min-height: 100%; margin: 0; background: var(--paper); color: var(--ink); font: 18px/1.35 var(--serif); -webkit-font-smoothing: antialiased;
+  display: grid; grid-template-columns: minmax(0, 1040px); justify-content: center;
+  grid-template-rows: auto auto minmax(clamp(300px, 64vh, 900px), 1fr) auto auto auto auto auto; overflow-x: hidden; box-sizing: border-box;
+  padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); padding-block: 10px 14px; }
+#paper { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+button, input, select { font: inherit; color: inherit; }
+#bar { grid-row: 1; } #err { grid-row: 2; } #stage { grid-row: 3; } #credit { grid-row: 4; } #ctl { grid-row: 5; } #tools { grid-row: 6; } #fn { grid-row: 7; } #facts { grid-row: 8; }
+a { color: inherit; }
+
+/* header and input line */
+#head { display: flex; align-items: center; gap: 18px; padding: 4px 4px 10px; border-bottom: 1px solid var(--rule); }
+#title { display: flex; align-items: center; gap: 20px; user-select: none; min-width: 0; }
+#title h1 { margin: 0; font: 500 26px/1 var(--serif); letter-spacing: .32em; text-transform: uppercase; white-space: nowrap; }
+#title .sep { width: 1px; height: 40px; background: var(--rule); flex: none; }
+.logo { width: 44px; height: 44px; display: block; flex: none; }
+#title .logo { cursor: pointer; } #title .logo.spin { animation: peen 0.8s ease-in-out both; }
+@keyframes peen { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+#toWeener { text-decoration: none; } #toWeener:hover h1 { color: var(--red); }
+#openW { margin-left: auto; font-style: italic; font-size: 19px; text-decoration: none; white-space: nowrap; }
+#openW:hover, #help summary:hover { color: var(--red); }
+#inrow { display: flex; align-items: center; gap: 16px; padding: 4px 4px; border-bottom: 1px solid var(--rule); }
+#inp { flex: 1 1 auto; min-width: 0; height: 48px; padding: 0; border: 0; background: transparent; font: 400 23px var(--serif); letter-spacing: .03em; word-spacing: .4em; font-variant-numeric: lining-nums; }
+#inp:focus { outline: none; } #inrow:focus-within { border-bottom-color: var(--ink-2); }
+details { position: relative; flex: none; }
+summary { list-style: none; cursor: pointer; display: flex; align-items: center; height: 40px; padding-left: 26px; border-left: 1px solid var(--rule); font-style: italic; font-size: 19px; }
+summary::-webkit-details-marker { display: none; }
+details ul { position: absolute; right: 0; top: calc(100% + 8px); z-index: 3; background: var(--field); border: 1px solid var(--rule); box-shadow: 0 14px 40px rgba(70, 50, 20, .16);
+  margin: 0; padding: 14px 18px; list-style: none; white-space: nowrap; font-size: 16px; display: grid; gap: 4px; max-height: 70vh; overflow-y: auto; }
+code { font: 14px var(--mono); background: var(--lav); padding: 1px 5px; }
+#help .exh { margin-top: 8px; color: var(--ink-2); font-size: 13px; letter-spacing: .18em; text-transform: uppercase; }
+#help .ex { font: 14px var(--mono); height: 28px; padding: 0 10px; margin-right: 6px; }
+kbd { font: 13px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; padding: 0 5px; background: var(--field); }
+#err { color: var(--red-deep); border-bottom: 1px solid var(--rule); padding: 8px 4px; font-style: italic; }
+button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+
+/* picture: no frame; the painting's edge dissolves into dots */
+#stage { position: relative; min-height: 180px; margin-top: 8px; overflow: hidden; cursor: grab; touch-action: none; }
+#stage:active { cursor: grabbing; }
+#stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#credit { text-align: center; font-style: italic; font-size: 17px; color: #4a4136; padding: 2px 4px 10px; border-bottom: 1px solid var(--rule); }
+
+/* controls */
+button { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 22px; border-radius: 2px; border: 1px solid #b9ab94;
+  background: var(--field); font-style: italic; font-size: 18px; white-space: nowrap; cursor: pointer; transition: background-color .12s, border-color .12s, color .12s; }
+button:hover { background: #fff; border-color: var(--ink-2); }
+#play { width: 122px; height: 46px; flex: none; background: var(--red); border-color: var(--red); color: #fff; font-size: 22px; letter-spacing: .03em; box-shadow: 0 1px 0 rgba(120, 30, 20, .25); }
+#play:hover { background: var(--red-deep); border-color: var(--red-deep); }
+select { height: 38px; padding: 0 12px; border: 1px solid #b9ab94; border-radius: 2px; background: var(--field); font-size: 18px; min-width: 0; max-width: 100%; }
+#ctl { display: flex; align-items: center; gap: 28px; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+#ctl .vr, #tools .vr { width: 1px; align-self: stretch; background: var(--rule); flex: none; }
+#ctl input[type=range] { flex: 1 1 auto; min-width: 60px; }
+#ctl .num { flex: none; font-size: 22px; }
+#tools { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 12px 28px; padding: 14px 16px 12px; font-size: 18px; border-bottom: 1px solid var(--rule); }
+#tools .grp { display: flex; align-items: center; gap: 14px; min-width: 0; }
+#tools label { display: flex; align-items: center; gap: 14px; font-style: italic; min-width: 0; }
+#tools #paintL { flex: 1 1 auto; } #tools #paintL select { flex: 1 1 auto; font-style: normal; }
+#tools #unitL { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 8px; margin: 0; border-radius: 99px; cursor: pointer; background: var(--lav-2); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--field); border: 2.5px solid var(--red); }
+input[type="range"]::-moz-range-thumb { width: 17px; height: 17px; border-radius: 50%; background: var(--field); border: 2.5px solid var(--red); }
+#dots::-webkit-slider-thumb { border-color: var(--violet); } #dots::-moz-range-thumb { border-color: var(--violet); }
+input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; margin: 0; }
+.num { font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+#dayv { display: inline-block; min-width: 3ch; } #fv { display: inline-block; min-width: 9ch; }
+#dotsv { display: inline-block; min-width: 4ch; font-style: normal; }
+#unit { font: 17px var(--mono); letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dot { display: inline-block; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--red); }
+.muted { color: var(--ink-2); }
+
+/* formula */
+#fn { display: grid; justify-items: center; gap: 2px; padding: 10px 16px 10px; border-bottom: 1px solid var(--rule); }
+#poly { font: 400 29px/1.2 var(--serif); font-variant-numeric: lining-nums; text-align: center; max-width: 100%; overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: .15em 0; scrollbar-width: none; }
+#poly::-webkit-scrollbar { display: none; }
+#poly i { font-style: italic; } #poly sup { font-size: .6em; vertical-align: .9em; line-height: 0; }
+.fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 .12em; line-height: 1.05; }
+.fr > span:first-child { border-bottom: 1.5px solid currentColor; padding: 0 .1em .04em; }
+.fr > span:last-child { padding-top: .04em; }
+#fnmeta { justify-self: stretch; display: flex; align-items: center; gap: 22px; font-style: italic; font-size: 25px; }
+#fnmeta .vr { width: 1px; height: 30px; background: var(--rule); }
+#meth { color: var(--ink-2); }
+#fnmeta:has(#meth:empty) .vr { display: none; }
+
+/* counts table */
+#facts { display: block; overflow-x: auto; overflow-y: hidden; padding: 6px 0 4px; border-bottom: 1px solid var(--rule); }
+#facts { scrollbar-width: thin; scrollbar-color: #b9ab94 transparent; }
+#facts::-webkit-scrollbar { height: 8px; background: transparent; }
+#facts::-webkit-scrollbar-track { background: transparent; }
+#facts::-webkit-scrollbar-thumb { background: #cbbda5; border-radius: 99px; }
+#facts::-webkit-scrollbar-thumb:hover { background: var(--ink-2); }
+#counts { border-collapse: separate; border-spacing: 0; font: 18px/1.3 var(--serif); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+#counts th { position: sticky; left: 0; z-index: 1; background: var(--paper); text-align: left; font-weight: 400; font-style: italic; padding: 4px 30px 4px 16px; }
+#counts td { text-align: center; padding: 4px 14px; min-width: 3.4em; }
+#counts tr:first-child td, #counts tr:first-child th { border-bottom: 1px solid var(--rule); }
+#counts tr:first-child td { padding-bottom: 7px; } #counts tr:nth-child(2) td, #counts tr:nth-child(2) th { padding-top: 7px; }
+#counts td.st { box-shadow: inset 2px 0 0 rgba(201, 72, 58, .55); }
+#counts td.cur { background: var(--lav); }
+#counts td { cursor: pointer; } #counts td.hov { background: #efe8f2; } #counts td.cur.hov { background: var(--lav); }
+
+@media (max-width: 760px) {
+  body { font-size: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  #title { gap: 12px; } #title .sep { display: none; } #title h1 { font-size: 19px; letter-spacing: .22em; }
+  .logo { width: 34px; height: 34px; } #openW { font-size: 15px; }
+  #inp { font-size: 17px; height: 42px; word-spacing: .15em; } summary { font-size: 16px; padding-left: 14px; }
+  #ctl { gap: 14px; padding: 10px 4px; } #play { width: 84px; height: 40px; font-size: 18px; } #ctl .num { font-size: 17px; }
+  #ctl .vr { display: none; }
+  #tools { grid-template-columns: 1fr; gap: 8px; padding: 10px 4px; font-size: 16px; } #tools .vr { display: none; }
+  button { padding: 0 12px; font-size: 16px; height: 32px; } select { font-size: 16px; height: 34px; }
+  #unit { font-size: 14px; } #credit { font-size: 15px; }
+  #poly { font-size: 21px; } #fnmeta { font-size: 18px; gap: 12px; } #fnmeta .vr { height: 22px; }
+  #counts { font-size: 15px; } #counts th { padding: 3px 14px 3px 4px; } #counts td { padding: 3px 8px; min-width: 2.6em; }
+}
+
+/* loading screen: the painting grows out of the centre as a dot pattern while the real painting downloads */
+#loader { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto; justify-items: center; align-items: center; gap: 10px;
+  padding: calc(30px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(30px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: var(--paper) radial-gradient(rgba(140, 110, 60, .10) 1px, transparent 1.4px) 0 0 / 14px 14px; transition: opacity .7s ease; }
+#loader.out { opacity: 0; pointer-events: none; }
+.ld-title { font: 500 17px var(--serif); letter-spacing: .62em; padding-left: .62em; text-transform: uppercase; color: #3b3328; }
+#ldc { width: 100%; height: 100%; max-width: 1000px; }
+.ld-msg { font: italic 24px var(--serif); letter-spacing: .06em; color: #3b3328; font-variant-numeric: lining-nums tabular-nums; }
+.ld-step { margin-top: -4px; font: 15px var(--serif); letter-spacing: .04em; color: #8a7d68; }
+.ld-dots i { display: inline-block; width: 6px; height: 6px; margin: 0 5px; border-radius: 50%; background: #d9473a; animation: ld 1.2s ease-in-out infinite; }
+.ld-dots i:nth-child(2) { animation-delay: .15s; } .ld-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes ld { 0%, 100% { opacity: .25; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .ld-dots i { animation: none; opacity: .7; } }
+</style>
+</head>
+<body>
+<canvas id="paper" aria-hidden="true"></canvas>
+<div id="loader" role="status" aria-live="polite">
+  <div class="ld-title">Peener Sim</div>
+  <canvas id="ldc" aria-hidden="true"></canvas>
+  <div class="ld-msg">Loading · <span id="ldp">0</span>%</div>
+  <div class="ld-step" id="lds">Downloading the painting</div>
+  <div class="ld-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+</div>
+<form id="bar" autocomplete="off">
+  <div id="head">
+    <div id="title"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="8.0" cy="4.0" r="3.3" fill="#6c84c8"/><circle cx="16.0" cy="4.0" r="3.3" fill="#7480c6"/><circle cx="24.0" cy="4.0" r="3.3" fill="#7480c6"/><circle cx="8.0" cy="12.0" r="3.3" fill="#7480c6"/><circle cx="32.0" cy="12.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="20.0" r="3.3" fill="#3d4787"/><circle cx="16.0" cy="20.0" r="3.3" fill="#7c7cc3"/><circle cx="24.0" cy="20.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="28.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="36.0" r="3.3" fill="#7c7cc3"/></svg><span class="sep"></span><a id="toWeener" href="#" title="Reload Peener Sim"><h1>Peener Sim</h1></a></div>
+    <a id="openW" href="../" target="_blank" rel="noopener">Open Weener Sim ↗</a>
+  </div>
+  <div id="inrow">
+  <input id="inp" spellcheck="false" aria-label="Vectors" value="(-45,64) (64,-45) (-34,-34) (-49,-67)">
+<details id="help"><summary>Inputs ↗</summary><ul>
+    <li class="exh">Types of inputs accepted</li>
+    <li><code>(3,1) (0,2)</code> or <code>3,1 0,2</code> points</li>
+    <li><code>(1/2,1/2) (0.5,-1)</code> fractions: only sums landing on whole-number points count</li>
+    <li><code>0 1 5</code> the set {0, 1, 5} on a number line</li>
+    <li><code>00001,00000,01W00</code> a grid of marked cells</li>
+    <li><code>&lt;t, 2t&gt; t=0..5</code> a formula with a range; also <code>round sin cos sqrt pi abs min max</code></li>
+    <li><code>{[0,1] [0,2] : [1,1] [1,2]}</code> start at [0,1] and [0,2], move only by [1,1] and [1,2]; several groups combine</li>
+    <li class="exh">Keys</li>
+    <li><kbd>Space</kbd> play or pause · <kbd>Esc</kbd> reset to day 0</li>
+    <li class="exh">Examples to try</li>
+    <li><button type="button" class="ex">(1,0) (0,1)</button> fills a solid triangle</li>
+    <li><button type="button" class="ex">(1,0) (0,1) (-1,-1)</button> covers everything</li>
+    <li><button type="button" class="ex">(2,0) (0,2) (-2,-2)</button> only every other point</li>
+    <li><button type="button" class="ex">(3,1) (-2,5) (-4,-3)</button> a lopsided triangle</li>
+    <li><button type="button" class="ex">(-45,64) (64,-45) (-34,-34) (-49,-67)</button> diagonal stripes</li>
+    <li><button type="button" class="ex">&lt;round(10cos(2pi t/24)), round(10sin(2pi t/24))&gt; t=0..23</button> a circle</li>
+    <li><button type="button" class="ex">(1/2,1/2) (1,0) (-1/2,1/3)</button> fractions</li>
+    <li><button type="button" class="ex">00001,00000,01W00,10010,00000</button> a 5×5 grid pattern</li>
+    <li><button type="button" class="ex">{[0,1] [0,2] : [1,1] [1,2]}</button> two starts, two moves</li>
+    <li><button type="button" class="ex">{[-30,0] : [1,0] [0,1] [-1,-1]} {[30,0] : [2,0] [0,2] [-2,-2]}</button> two groups</li>
+    <li><button type="button" class="ex">0 1 5</button> a line</li>
+    <li><button type="button" class="ex">&lt;t, t^2&gt; t=-3..3</button> a parabola</li>
+  </ul></details>
+  </div>
+</form>
+<div id="err" hidden></div>
+<div id="stage" title="Scroll to zoom, drag to move, double-click to fit"><canvas id="art"></canvas></div>
+<div id="credit"></div>
+<div id="ctl">
+  <button type="button" id="play">Play</button>
+  <input type="range" id="day" min="0" max="1" value="0" aria-label="Day">
+  <span class="vr"></span>
+  <span class="num">Day <span id="dayv">0</span></span>
+  <span class="vr"></span>
+  <span class="num"><i>f</i> = <span id="fv">1</span></span>
+</div>
+<div id="tools">
+  <span class="grp"><button type="button" id="zin">Zoom in</button><button type="button" id="zout">Zoom out</button><button type="button" id="zfit">Fit</button></span>
+  <span class="vr"></span>
+  <label id="paintL">Painting <select id="paint"></select></label>
+  <label>Dots across <input type="range" id="dots" min="100" max="5000" step="100" value="1200" style="width:10em"> <span id="dotsv" class="num">1200</span></label>
+  <span class="vr"></span>
+  <span class="grp"><label><input type="checkbox" id="loop"> Loop</label><button type="button" id="reset">Reset</button></span>
+  <span id="unitL"><span class="dot"></span><span id="unit"></span></span>
+</div>
+<div id="fn"><div id="poly">…</div><div id="fnmeta"><span id="stab"></span><span class="vr"></span><span id="meth"></span></div></div>
+<div id="facts">…</div>
+
+<script id="wsrc" type="text/plain">
+// Layer-by-layer growth on a bitmap: one bit per lattice point of the box around n·P, so each step is a bit test.
+// Exact route: f(n) is the Hilbert function of the toric ring k[A]. Build the toric ideal from a
+// reduced lattice basis of ker(M) by saturation (Sturmfels, Alg. 12.3), take its initial ideal and
+// read the Hilbert numerator off the monomial ideal. Gives H(t), so n0 = max(0, deg H − r) is proved.
+function exactSeries(P, r, lead, cap) {
+  const k = P.length, m = r + 1;
+  const M = []; for (let j = 0; j < r; j++) M.push(P.map((p) => p[j])); M.push(P.map(() => 1));
+  // integer kernel of M via row reduction of [Mᵀ | I]
+  const rows = P.map((_, i) => [...M.map((row) => BigInt(row[i])), ...P.map((_, j) => (i === j ? 1n : 0n))]);
+  const babs = (x) => (x < 0n ? -x : x);
+  let pr = 0;
+  for (let c = 0; c < m; c++) {
+    for (;;) {
+      let best = -1;
+      for (let i = pr; i < k; i++) if (rows[i][c] !== 0n && (best < 0 || babs(rows[i][c]) < babs(rows[best][c]))) best = i;
+      if (best < 0) break;
+      [rows[pr], rows[best]] = [rows[best], rows[pr]];
+      let clean = true;
+      for (let i = pr + 1; i < k; i++) if (rows[i][c] !== 0n) {
+        const q = rows[i][c] / rows[pr][c];
+        for (let j = 0; j < m + k; j++) rows[i][j] -= q * rows[pr][j];
+        if (rows[i][c] !== 0n) clean = false;
+      }
+      if (clean) { pr++; break; }
+    }
+  }
+  let B = rows.slice(pr).map((row) => row.slice(m).map(Number));
+  B = lll(B);
+  const h0 = B.length ? groebnerLeads(B, k, cap) : [];
+  let N = hilbNum(h0, k, cap);
+  // H(t) = N(t) / (1−t)^(k−r−1)
+  for (let s = 0; s < k - r - 1; s++) {
+    const q = []; let acc = 0;
+    for (let i = 0; i < N.length; i++) { acc += N[i]; q.push(acc); }
+    if (q.pop() !== 0) throw new Error("division");
+    N = q;
+  }
+  while (N.length > 1 && N[N.length - 1] === 0) N.pop();
+  if (N.reduce((x, y) => x + y, 0) !== lead) throw new Error("multiplicity check");
+  return N;
+}
+
+function lll(B) {
+  const n = B.length; if (n < 2) return B;
+  B = B.map((v) => v.slice());
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+  let Bs, mu, bb;
+  const gs = () => {
+    Bs = []; mu = B.map(() => new Array(n).fill(0)); bb = [];
+    for (let i = 0; i < n; i++) {
+      const v = B[i].slice();
+      for (let j = 0; j < i; j++) { mu[i][j] = dot(B[i], Bs[j]) / bb[j]; for (let t = 0; t < v.length; t++) v[t] -= mu[i][j] * Bs[j][t]; }
+      Bs.push(v); bb.push(dot(v, v));
+    }
+  };
+  gs();
+  let kk = 1, it = 0;
+  while (kk < n && it++ < 20000) {
+    for (let j = kk - 1; j >= 0; j--) { const q = Math.round(mu[kk][j]); if (q) { for (let t = 0; t < B[kk].length; t++) B[kk][t] -= q * B[j][t]; gs(); } }
+    if (bb[kk] >= (0.75 - mu[kk][kk - 1] ** 2) * bb[kk - 1]) kk++;
+    else { [B[kk], B[kk - 1]] = [B[kk - 1], B[kk]]; gs(); kk = Math.max(kk - 1, 1); }
+  }
+  return B;
+}
+
+function groebnerLeads(basis, k, cap) {
+  const order = (perm) => (a, b) => {
+    let da = 0, db = 0; for (let i = 0; i < k; i++) { da += a[i]; db += b[i]; }
+    if (da !== db) return da - db;
+    for (let t = k - 1; t >= 0; t--) { const i = perm[t]; if (a[i] !== b[i]) return b[i] - a[i]; }
+    return 0;
+  };
+  let gens = basis.map((u) => [u.map((x) => Math.max(x, 0)), u.map((x) => Math.max(-x, 0))]);
+  const all = [...Array(k).keys()];
+  for (let i = 0; i < k; i++) {
+    const G = groebner(gens, order([...all.filter((j) => j !== i), i]), k, cap);
+    gens = G.map(([a, b]) => { const s = Math.min(a[i], b[i]); const a2 = a.slice(), b2 = b.slice(); a2[i] -= s; b2[i] -= s; return [a2, b2]; });
+  }
+  return groebner(gens, order(all), k, cap).map((g) => g[0]);
+}
+
+function groebner(gens, cmp, k, cap) {
+  const G = [], heap = [];
+  const push = (d, i, j) => { heap.push([d, i, j]); let c = heap.length - 1; while (c) { const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let s = c; if (l < heap.length && heap[l][0] < heap[s][0]) s = l; if (r < heap.length && heap[r][0] < heap[s][0]) s = r; if (s === c) break; [heap[s], heap[c]] = [heap[c], heap[s]]; c = s; } } return top; };
+  const orient = (a, b) => { const c = cmp(a, b); return c === 0 ? null : c > 0 ? [a, b] : [b, a]; };
+  const divides = (c, a) => { for (let i = 0; i < k; i++) if (c[i] > a[i]) return false; return true; };
+  const reduce = (f) => {
+    for (;;) {
+      if (--cap.steps < 0 || Date.now() > cap.until) throw new Error("cap");
+      let hit = null; for (const g of G) if (divides(g[0], f[0])) { hit = g; break; }
+      if (!hit) return f;
+      const a = new Array(k); for (let i = 0; i < k; i++) a[i] = f[0][i] - hit[0][i] + hit[1][i];
+      f = orient(a, f[1]); if (!f) return null;
+    }
+  };
+  const add = (f) => {
+    const j = G.length; G.push(f);
+    if (G.length > cap.maxG) throw new Error("cap");
+    for (let i = 0; i < j; i++) {
+      const g = G[i]; let coprime = true, d = 0;
+      for (let t = 0; t < k; t++) { if (f[0][t] && g[0][t]) coprime = false; d += Math.max(f[0][t], g[0][t]); }
+      if (!coprime) push(d, i, j);
+    }
+  };
+  for (const [a, b] of gens) { let f = orient(a.slice(), b.slice()); if (f) f = reduce(f); if (f) add(f); }
+  while (heap.length) {
+    const [, i, j] = pop(), f = G[i], g = G[j];
+    const lcm = f[0].map((x, t) => Math.max(x, g[0][t]));
+    let s = orient(lcm.map((x, t) => x - f[0][t] + f[1][t]), lcm.map((x, t) => x - g[0][t] + g[1][t]));
+    if (s) s = reduce(s);
+    if (s) add(s);
+  }
+  return G.filter((g, i) => !G.some((h, j) => j !== i && divides(h[0], g[0]) && (!divides(g[0], h[0]) || j < i)));
+}
+
+// numerator N(t) of the Hilbert series N(t)/(1−t)^k of S/(monomials), by pivoting on a pure power
+function hilbNum(gens, k, cap) {
+  const deg = (g) => g.reduce((x, y) => x + y, 0);
+  const add = (p, q) => { const r = new Array(Math.max(p.length, q.length)).fill(0); p.forEach((c, i) => (r[i] += c)); q.forEach((c, i) => (r[i] += c)); return r; };
+  const shift = (p, e) => [...new Array(e).fill(0), ...p];
+  const mul = (p, q) => { const r = new Array(p.length + q.length - 1).fill(0); p.forEach((a, i) => q.forEach((b, j) => (r[i + j] += a * b))); return r; };
+  const minimal = (L) => {
+    L = L.slice().sort((a, b) => deg(a) - deg(b)); const out = [];
+    for (const g of L) if (!out.some((h) => h.every((x, i) => x <= g[i]))) out.push(g);
+    return out;
+  };
+  const rec = (L) => {
+    if (--cap.steps < 0 || Date.now() > cap.until) throw new Error("cap");
+    L = minimal(L);
+    if (!L.length) return [1];
+    if (L.some((g) => deg(g) === 0)) return [0];
+    const cnt = new Array(k).fill(0); for (const g of L) g.forEach((x, i) => { if (x) cnt[i]++; });
+    if (cnt.every((c) => c <= 1)) return L.reduce((p, g) => mul(p, [1, ...new Array(deg(g) - 1).fill(0), -1]), [1]);
+    let j = 0; for (let i = 1; i < k; i++) if (cnt[i] > cnt[j]) j = i;
+    const ex = L.map((g) => g[j]).filter((x) => x > 0).sort((a, b) => a - b);
+    const e = ex[(ex.length - 1) >> 1];
+    const p = new Array(k).fill(0); p[j] = e;
+    const plus = rec([...L.filter((g) => g[j] < e), p]);
+    const colon = rec(L.map((g) => g.map((x, i) => (i === j ? Math.max(0, x - e) : x))));
+    return add(plus, shift(colon, e));
+  };
+  return rec(gens);
+}
+
+// Count first (a small pattern settles in milliseconds) and show that at once; then prove it with the
+// exact Hilbert series, which can take seconds when there are many points. Large patterns that the exact
+// route cannot finish fall back to a full count.
+onmessage = (e) => {
+  const { G, r, lead, maxBits, maxDay, q = 1, groups } = e.data;
+  if (groups) { const full = countGroups(groups, r, maxBits, maxDay, q); postMessage({ f: full.f, done: true, reason: full.reason }); return; }
+  // the exact route takes milliseconds up to 6 points, about a second at 8, and almost never finishes past 8
+  if (q > 1 || G.length > 8) { const full = count(G, r, lead, maxBits, maxDay, Infinity, true, q); postMessage({ f: full.f, done: true, reason: full.reason }); return; }
+  const quick = count(G, r, lead, 2 ** 24, maxDay, Date.now() + 300, false);
+  if (quick.reason === "stable") postMessage({ f: quick.f, done: true, reason: "stable", provisional: true });
+  try {
+    const H = exactSeries([[0, 0], ...G].map((p) => (r === 1 ? [p[0]] : p)), r, lead, { steps: 4e7, maxG: 6000, until: Date.now() + 2500 });
+    const n0 = Math.max(0, H.length - 1 - r), N = Math.max(30, n0 + 25);
+    const Cb = (m, j) => { if (m < j) return 0; let v = 1; for (let i = 0; i < j; i++) v = v * (m - i) / (i + 1); return v; };
+    const f = []; for (let n = 0; n <= N; n++) { let v = 0; for (let j = 0; j < H.length && j <= n; j++) v += H[j] * Cb(n - j + r, r); f.push(v); }
+    postMessage({ f, done: true, reason: "exact", size: 0 });
+    return;
+  } catch (err) { /* too large for the exact route */ }
+  const full = quick.reason === "stable" ? quick : count(G, r, lead, maxBits, maxDay, Infinity, true);
+  postMessage({ f: full.f, done: true, reason: full.reason, size: full.f[full.f.length - 1] });
+};
+// Union over groups of the points reachable from that group's starts in at most n of its moves. One bitmap per
+// group (a point may be reached by several groups) and one for the union; only whole-number points are counted.
+function countGroups(groups, r, maxBits, maxDay, q) {
+  let sx0 = Infinity, sx1 = -Infinity, sy0 = Infinity, sy1 = -Infinity, mx0 = 0, mx1 = 0, my0 = 0, my1 = 0;
+  for (const g of groups) {
+    for (const [x, y] of g.starts) { sx0 = Math.min(sx0, x); sx1 = Math.max(sx1, x); sy0 = Math.min(sy0, y); sy1 = Math.max(sy1, y); }
+    for (const [x, y] of g.moves) { mx0 = Math.min(mx0, x); mx1 = Math.max(mx1, x); my0 = Math.min(my0, y); my1 = Math.max(my1, y); }
+  }
+  const NG = groups.length;
+  const lay = (nc) => ({ W: sx1 - sx0 + nc * (mx1 - mx0) + 1, H: sy1 - sy0 + nc * (my1 - my0) + 1, ox: -(sx0 + nc * mx0), oy: -(sy0 + nc * my0) });
+  let lo = 1, hi = 1 << 30; while (lo < hi) { const m = Math.ceil((lo + hi) / 2); const L = lay(m); ((NG + 1) * L.W * L.H <= maxBits) ? lo = m : hi = m - 1; }
+  const nMax = lo;
+  let L = null, maps = null, cap = 0;
+  const grow = (nc) => {
+    const Ln = lay(nc), words = Math.ceil(Ln.W * Ln.H / 32);
+    maps = Array.from({ length: NG + 1 }, (_, b) => {
+      const nb = new Int32Array(words);
+      if (maps) { const old = maps[b]; for (let w = 0; w < old.length; w++) { let v = old[w]; while (v) { const bit = 31 - Math.clz32(v & -v); v &= v - 1;
+        const id = w * 32 + bit, x = (id % L.W) - L.ox, y = Math.floor(id / L.W) - L.oy, ni = x + Ln.ox + (y + Ln.oy) * Ln.W; nb[ni >>> 5] |= 1 << (ni & 31); } } }
+      return nb;
+    });
+    L = Ln; cap = nc;
+  };
+  const C = (n, j) => { let v = 1; for (let i = 0; i < j; i++) v = v * (n - i) / (i + 1); return v; };
+  const diff = (f, d, n) => { let s = 0; for (let j = 0; j <= d; j++) s += (j % 2 ? -1 : 1) * C(d, j) * f[n - j * q]; return s; };
+  grow(Math.min(nMax, 24));
+  const U = NG;
+  const mark = (b, x, y) => { const i = x + L.ox + (y + L.oy) * L.W, w = i >>> 5, m = 1 << (i & 31); if (maps[b][w] & m) return false; maps[b][w] |= m; return true; };
+  let f0 = 0;
+  let fronts = groups.map((g, b) => { const fr = []; for (const [x, y] of g.starts) if (mark(b, x, y)) { fr.push(x, y); if (mark(U, x, y) && x % q === 0 && y % q === 0) f0++; } return fr; });
+  const f = [f0];
+  let s = (r + 1) * q, reason = "stable";
+  for (let n = 1; ; n++) {
+    if (n > cap) { if (cap >= nMax) { reason = "budget"; break; } grow(Math.min(nMax, Math.max(n, Math.ceil(cap * 1.42)))); }
+    let cnt = 0;
+    fronts = fronts.map((fr, b) => {
+      const nx = [], mv = groups[b].moves;
+      for (let i = 0; i < fr.length; i += 2) for (const [gx, gy] of mv) {
+        const x = fr[i] + gx, y = fr[i + 1] + gy;
+        if (mark(b, x, y)) { nx.push(x, y); if (mark(U, x, y) && x % q === 0 && y % q === 0) cnt++; }
+      }
+      return nx;
+    });
+    f.push(f[n - 1] + cnt);
+    if (n >= (r + 1) * q && diff(f, r + 1, n) !== 0) s = n + 1;
+    if (s <= n && n >= s + Math.max(15 * q, Math.ceil(s / 2)) && n >= 20 * q) break;
+    if (n >= maxDay) { reason = "days"; break; }
+  }
+  return { f, reason };
+}
+function count(G, r, lead, maxBits, maxDay, until, progress, q = 1) {
+  let xmin = 0, xmax = 0, ymin = 0, ymax = 0;
+  for (const [x, y] of G) { xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); ymin = Math.min(ymin, y); ymax = Math.max(ymax, y); }
+  const dx = xmax - xmin, dy = ymax - ymin, k = G.length;
+  const nFor = (bitsAvail) => { let lo = 1, hi = 1 << 30; while (lo < hi) { const m = Math.ceil((lo + hi) / 2); ((m * dx + 1) * (m * dy + 1) <= bitsAvail) ? lo = m : hi = m - 1; } return lo; };
+  const nMax = nFor(maxBits);
+  let cap = 0, W = 0, ox = 0, oy = 0, bits = null;
+  const grow = (nc) => {
+    const nW = nc * dx + 1, nH = nc * dy + 1, nox = -nc * xmin, noy = -nc * ymin, nb = new Int32Array(Math.ceil(nW * nH / 32));
+    if (bits) for (let w = 0; w < bits.length; w++) { let v = bits[w]; while (v) { const b = 31 - Math.clz32(v & -v); v &= v - 1;
+      const id = w * 32 + b, x = (id % W) - ox, y = Math.floor(id / W) - oy, ni = (x + nox) + (y + noy) * nW; nb[ni >>> 5] |= 1 << (ni & 31); } }
+    bits = nb; W = nW; ox = nox; oy = noy; cap = nc;
+  };
+  const C = (n, j) => { let v = 1; for (let i = 0; i < j; i++) v = v * (n - i) / (i + 1); return v; };
+  const diff = (f, d, n) => { let s = 0; for (let j = 0; j <= d; j++) s += (j % 2 ? -1 : 1) * C(d, j) * f[n - j * q]; return s; };
+  grow(Math.min(nMax, 24));
+  { const i = ox + oy * W; bits[i >>> 5] |= 1 << (i & 31); }
+  const f = [1];
+  let fx = new Int32Array([0]), fy = new Int32Array([0]), flen = 1, s = (r + 1) * q, last = Date.now(), reason = "stable";
+  const gx = Int32Array.from(G, (p) => p[0]), gy = Int32Array.from(G, (p) => p[1]);
+  for (let n = 1; ; n++) {
+    if (n > cap) { if (cap >= nMax) { reason = "budget"; break; } grow(Math.min(nMax, Math.max(n, Math.ceil(cap * 1.42)))); }
+    const off = new Float64Array(k); for (let j = 0; j < k; j++) off[j] = gx[j] + gy[j] * W;
+    let nx = new Int32Array(Math.max(64, flen * 2 + k)), ny = new Int32Array(nx.length), nl = 0, nq = 0;
+    for (let i = 0; i < flen; i++) {
+      const px = fx[i], py = fy[i], base = (px + ox) + (py + oy) * W;
+      if (nl + k > nx.length) { const a = new Int32Array(nx.length * 2), b = new Int32Array(nx.length * 2); a.set(nx); b.set(ny); nx = a; ny = b; }
+      for (let j = 0; j < k; j++) {
+        const id = base + off[j], w = id >>> 5, m = 1 << (id & 31);
+        if (!(bits[w] & m)) { bits[w] |= m; const x = px + gx[j], y = py + gy[j]; nx[nl] = x; ny[nl] = y; nl++; if (q === 1 || (x % q === 0 && y % q === 0)) nq++; }
+      }
+    }
+    fx = nx; fy = ny; flen = nl; f.push(f[n - 1] + nq);
+    if (n >= (r + 1) * q && diff(f, r + 1, n) !== 0) s = n + 1;
+    if (q === 1 ? s <= n && n >= r && diff(f, r, n) === lead && n >= s + Math.max(15, Math.ceil(s / 2)) && n >= 20
+      : s <= n && n >= s + Math.max(15 * q, Math.ceil(s / 2)) && n >= 20 * q) break;
+    if (n >= maxDay) { reason = "days"; break; }
+    if (Date.now() > until) { reason = "time"; break; }
+    if (progress && Date.now() - last > 150) { last = Date.now(); postMessage({ f: f.slice(), done: false, size: f[n] }); }
+  }
+  return { f, reason };
+}
+</script>
+<script id="gsrc" type="text/plain">
+// First day each painting point is reached, as the union over groups of everything reachable from that group's
+// starts in at most n of its moves. Each group is searched inside the box around the picture and the starts plus a
+// margin of 4·max|move|: by the Steinitz lemma any n moves from a start s ending at x can be reordered so every
+// partial sum stays within that margin of the segment from s to x, so restricting the search loses nothing.
+// A guard band one move wide is pre-marked so the inner loop needs no bounds checks. Results stream day by day.
+onmessage = (e) => {
+  const { N, M, cx, cy, q = 1 } = e.data;
+  const groups = e.data.groups || [{ starts: [[0, 0]], moves: e.data.A.filter(([x, y]) => x || y) }];
+  let mx = 0; for (const g of groups) for (const [x, y] of g.moves) mx = Math.max(mx, Math.abs(x), Math.abs(y));
+  // painting in units of 1/q: x from −q·cx to q(N−1−cx), y from −q(M−1−cy) to q·cy
+  let X0 = -q * cx, X1 = q * (N - 1 - cx), Y0 = -q * (M - 1 - cy), Y1 = q * cy;
+  for (const g of groups) for (const [x, y] of g.starts) { X0 = Math.min(X0, x); X1 = Math.max(X1, x); Y0 = Math.min(Y0, y); Y1 = Math.max(Y1, y); }
+  const m = 4 * mx + 1, pad = Math.max(1, mx), o = m + pad, BW = X1 - X0 + 1 + 2 * o, BH = Y1 - Y0 + 1 + 2 * o;
+  if (groups.length * BW * BH > 300e6) { postMessage({ error: "Points too far apart for this many dots; lower Dots across." }); return; }
+  const idx = (x, y) => (Y1 - y + o) * BW + (x - X0 + o);
+  const cellOf = (k) => {
+    const x = (k % BW) - o + X0, y = Y1 - (((k / BW) | 0) - o);
+    if (x % q || y % q) return -1;
+    const i = x / q + cx, j = cy - y / q;
+    return i < 0 || j < 0 || i >= N || j >= M ? -1 : j * N + i;
+  };
+  const vis = groups.map(() => {
+    const v = new Uint8Array(BW * BH);
+    for (let y = 0; y < BH; y++) {
+      if (y < pad || y >= BH - pad) { v.fill(2, y * BW, (y + 1) * BW); continue; }
+      v.fill(2, y * BW, y * BW + pad); v.fill(2, (y + 1) * BW - pad, (y + 1) * BW);
+    }
+    return v;
+  });
+  const offs = groups.map((g) => Int32Array.from(g.moves, ([x, y]) => x - y * BW));
+  const painted = new Uint8Array(N * M);
+  let left = N * M, cells = new Int32Array(1 << 16), nc = 0, counts = [], last = Date.now();
+  const paint = (k) => { const c = cellOf(k); if (c >= 0 && !painted[c]) { painted[c] = 1; left--; if (nc === cells.length) { const t = new Int32Array(nc * 2); t.set(cells); cells = t; } cells[nc++] = c; return 1; } return 0; };
+  let today = 0;
+  let fronts = groups.map((g, b) => { const fr = []; for (const [x, y] of g.starts) { const k = idx(x, y); if (!vis[b][k]) { vis[b][k] = 1; fr.push(k); today += paint(k); } } return Int32Array.from(fr); });
+  counts.push(today);
+  const flush = (done) => { postMessage({ cells: cells.slice(0, nc), counts: Int32Array.from(counts), done }); nc = 0; counts = []; last = Date.now(); };
+  let d = 0;
+  while (left > 0 && d < 65533 && fronts.some((fr) => fr.length)) {
+    d++; today = 0;
+    fronts = fronts.map((fr, b) => {
+      const V = vis[b], off = offs[b], K = off.length;
+      let next = new Int32Array(Math.max(1024, fr.length * 2)), nl = 0;
+      for (let i = 0; i < fr.length; i++) {
+        const base = fr[i];
+        if (nl + K > next.length) { const t = new Int32Array(next.length * 2); t.set(next); next = t; }
+        for (let g = 0; g < K; g++) { const k = base + off[g]; if (V[k]) continue; V[k] = 1; next[nl++] = k; today += paint(k); }
+      }
+      return next.subarray(0, nl);
+    });
+    counts.push(today);
+    if (Date.now() - last > 120) flush(false);
+  }
+  flush(true);
+};
+</script>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
+const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+const half = (v2) => (v2 % 2 === 0 ? String(v2 / 2) : `${v2}/2`);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const MAXBITS = 2 ** 31, MAXDAY = 100000;
+
+// Formula input: ⟨expr, expr⟩ templates with integer ranges such as t=0..5, expanded over every combination of the ranges.
+const FUNCS = ["abs", "min", "max", "round", "floor", "ceil", "sqrt", "sin", "cos", "tan"];
+function evalExpr(src, env) {
+  const toks = src.match(/\d+(?:\.\d+)?|[a-zA-Z_]\w*|[-+*\/^%(),]|\S/g) || [];
+  const bad = toks.find((t) => !/^(?:\d|[a-zA-Z_]|[-+*\/^%(),])/.test(t));
+  if (bad) throw new Error(`Can't read "${bad}" in "${src}". Use numbers, variables, + − * / ^ %, pi and ${FUNCS.join(", ")}.`);
+  // implicit multiplication: 2t, 2pi, 8cos(…), 3(t+1), (t)(s), pi t
+  const T = [], isName = (t) => /^[a-z_]/i.test(t), isFn = (t) => FUNCS.includes(t);
+  for (const t of toks) {
+    const p = T[T.length - 1];
+    if (p && (/^\d/.test(p) || p === ")" || (isName(p) && !isFn(p))) && (isName(t) || t === "(" || (/^\d/.test(t) && p === ")"))) T.push("*");
+    T.push(t);
+  }
+  let i = 0;
+  const peek = () => T[i], next = () => T[i++];
+  const prim = () => {
+    const t = next();
+    if (t === undefined) throw new Error(`"${src}" ends too early.`);
+    if (/^\d/.test(t)) return Number(t);
+    if (t === "(") { const v = expr(); if (next() !== ")") throw new Error(`Missing ")" in "${src}".`); return v; }
+    if (t === "-") return -power();
+    if (t === "+") return power();
+    if (isFn(t)) {
+      if (next() !== "(") throw new Error(`Write ${t}(…) in "${src}".`);
+      const a = [expr()]; while (peek() === ",") { next(); a.push(expr()); }
+      if (next() !== ")") throw new Error(`Missing ")" in "${src}".`);
+      return t === "min" ? Math.min(...a) : t === "max" ? Math.max(...a) : t === "round" ? Math.round(a[0]) : Math[t](a[0]);
+    }
+    if (t === "pi") return Math.PI;
+    if (isName(t)) { if (!(t in env)) throw new Error(`Give a range for ${t}, like ${t}=0..5.`); return env[t]; }
+    throw new Error(`Unexpected "${t}" in "${src}".`);
+  };
+  const power = () => { const b = prim(); if (peek() === "^") { next(); return b ** power(); } return b; };
+  const term = () => {
+    let v = power();
+    while (["*", "/", "%"].includes(peek())) {
+      const op = next(), w = power();
+      if (op === "*") v *= w;
+      else if (w === 0) throw new Error(`Division by zero in "${src}".`);
+      else v = op === "/" ? v / w : ((v % w) + w) % w;
+    }
+    return v;
+  };
+  const expr = () => { let v = term(); while (peek() === "+" || peek() === "-") { const op = next(), w = term(); v = op === "+" ? v + w : v - w; } return v; };
+  const v = expr();
+  if (i !== T.length) throw new Error(`Unexpected "${T[i]}" in "${src}".`);
+  return v;
+}
+
+// Every coordinate must be a fraction p/q (q ≤ 1000); 0.25, 1/2 and results like 5/2 are fine, 5cos(1) is not.
+function toFrac(v, what) {
+  for (let q = 1; q <= 1000; q++) { const p = Math.round(v * q); if (Math.abs(v - p / q) < 1e-9 * Math.max(1, Math.abs(v))) return [p, q]; }
+  throw new Error(`${what} = ${+v.toFixed(6)} is not a simple fraction; wrap it in round(…).`);
+}
+
+function parse(text) {
+  text = text.replace(/[−–—]/g, "-").replace(/[⟨〈]/g, "<").replace(/[⟩〉]/g, ">").replace(/∈/g, " in ").replace(/…/g, "..");
+  if (!/[<>]/.test(text)) return parsePlain(text);
+  const ranges = {};
+  text = text.replace(/\b(?!(?:from|in|to|step|by)\b)([a-zA-Z_]\w*)\s+(?=-?\d+\s*(?:\.\.|\bto\b)\s*-?\d+)/g, "$1=");
+  text = text.replace(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*(-?\d+)\s*(?:\.\.|\bto\b|:|,)\s*(-?\d+)\s*\]?(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g, (_, v, a, b, st) => {
+    a = Number(a); b = Number(b); const step = Number(st || 1);
+    if (step < 1) throw new Error(`Step for ${v} must be at least 1.`);
+    if (b < a) throw new Error(`Range for ${v} runs backwards (${a} to ${b}).`);
+    if ((b - a) / step > 5000) throw new Error(`Range for ${v} has too many values; keep it under 5000.`);
+    ranges[v] = []; for (let x = a; x <= b; x += step) ranges[v].push(x);
+    return " ";
+  });
+  text = text.replace(/\b[a-zA-Z_]\w*\s*\([^()<>]*\)\s*=/g, " ");
+  const templates = [];
+  text = text.replace(/<([^<>]*)>/g, (_, body) => { templates.push(body); return " "; });
+  const rest = text.replace(/\b[a-zA-Z]{2,}\b/g, " ").replace(/^[\s,;]+|[\s,;]+$/g, "");
+  if (/[<>]/.test(rest)) throw new Error("Each formula needs a matching < and >.");
+  let pts = [], dim = null;
+  for (const body of templates) {
+    const parts = []; let depth = 0, cur = "";
+    for (const ch of body) { if (ch === "(") depth++; if (ch === ")") depth--; if (ch === "," && depth === 0) { parts.push(cur); cur = ""; } else cur += ch; }
+    parts.push(cur);
+    if (parts.length < 1 || parts.length > 2 || parts.some((q) => !q.trim())) throw new Error(`Write a formula as <x> or <x, y>; got <${body}>.`);
+    if (dim !== null && parts.length !== dim) throw new Error("All formulas and points need the same number of coordinates.");
+    dim = parts.length;
+    const vars = [...new Set((body.match(/[a-zA-Z_]\w*/g) || []).filter((v) => !FUNCS.includes(v) && v !== "pi"))];
+    for (const v of vars) if (!ranges[v]) throw new Error(`Give a range for ${v}, like ${v}=0..5.`);
+    let combos = [{}];
+    for (const v of vars) { combos = combos.flatMap((e) => ranges[v].map((x) => ({ ...e, [v]: x }))); if (combos.length > 20000) throw new Error("The ranges make more than 20,000 points; narrow them."); }
+    for (const env of combos) {
+      const p = parts.map((q) => evalExpr(q, env));
+      if (p.some((x) => Math.abs(x) > 1e5)) throw new Error(`A coordinate passed 100000 at ${vars.map((v) => `${v}=${env[v]}`).join(", ")}.`);
+      pts.push(dim === 1 ? [p[0], 0] : p);
+    }
+  }
+  if (rest) {
+    const extra = parsePlain(rest);
+    if (dim !== null && extra.dim !== dim) throw new Error("All formulas and points need the same number of coordinates.");
+    dim = extra.dim; pts = pts.concat(extra.pts);
+  }
+  if (!pts.length) throw new Error("The formula gave no points.");
+  return { pts, dim };
+}
+
+// {starts : moves} groups: growth begins at the starting points (which are not moves) and uses only that
+// group's moves. Everything outside braces is the usual set: it starts at (0,0) and its points are the moves.
+// The day-n set is the union over groups of everything reachable from a start in at most n moves.
+function parseInput(text) {
+  const groups = []; let dim = null;
+  const setDim = (d) => { if (dim !== null && d !== dim) throw new Error("All points need the same number of coordinates."); dim = d; };
+  const rest = text.replace(/\{([^{}]*)\}/g, (_, body) => {
+    const k = body.indexOf(":");
+    if (k < 0) throw new Error("Write a group as {starts : moves}, for example {[0,1] [0,2] : [1,1] [1,2]}.");
+    const L = body.slice(0, k).trim(), R = body.slice(k + 1).trim();
+    if (!L) throw new Error("A group needs at least one starting point before the colon.");
+    const st = parse(L); setDim(st.dim);
+    let mv = { pts: [] }; if (R) { mv = parse(R); setDim(mv.dim); }
+    groups.push({ starts: st.pts, moves: mv.pts });
+    return " ";
+  });
+  if (/[{}]/.test(rest)) throw new Error("Each { needs a matching }.");
+  const general = groups.length > 0;
+  if (rest.replace(/[\s,;]/g, "")) { const pl = parse(rest); setDim(pl.dim); groups.unshift({ starts: [[0, 0]], moves: pl.pts }); }
+  if (!groups.length) throw new Error("Enter at least one point.");
+  return { groups, dim, general };
+}
+
+function parsePlain(text) {
+  text = text.replace(/[−–—]/g, "-").trim();
+  if (!text) throw new Error("Enter at least one point.");
+  const rowsRaw = text.split(/[\n,\/|]+/).map((s) => s.replace(/\s+/g, "")).filter(Boolean);
+  const gridChars = /^[01W#.xXoO*@\n,\/|\s]+$/.test(text);
+  const looksGrid = gridChars && (/[W#.xXoO*@]/.test(text)
+    || (rowsRaw.length >= 3 && rowsRaw.every((s) => /^[01]+$/.test(s) && s.length === rowsRaw[0].length && s.length >= 3)));
+  if (looksGrid) {
+    const pts = [];
+    let wr = null, wc = null;
+    rowsRaw.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === "W") { wr = i; wc = j; } }));
+    rowsRaw.forEach((row, i) => [...row].forEach((ch, j) => {
+      if ("1#WxXoO*@".includes(ch)) pts.push([j - (wc ?? 0), (wr ?? 0) - i]);
+    }));
+    if (!pts.length) throw new Error("The grid has no marked cells.");
+    return { pts, dim: 2 };
+  }
+  let groups;
+  if (/[(\[]/.test(text)) {
+    groups = [...text.matchAll(/[(\[]([^)\]]*)[)\]]/g)].map((m) => m[1].split(/[\s,;]+/).filter(Boolean));
+  } else {
+    const toks = text.replace(/\s*,\s*/g, ",").split(/[\s;]+/).filter(Boolean);
+    groups = toks.some((t) => t.includes(",")) ? toks.map((t) => t.split(",").filter(Boolean)) : toks.map((t) => [t]);
+  }
+  const dim = groups[0].length;
+  if (dim < 1 || dim > 2) throw new Error("Use numbers on a line or 2-D points x,y.");
+  const pts = groups.map((g, i) => {
+    if (g.length !== dim) throw new Error(`Point ${i + 1} (${g.join(",")}) has ${g.length} coordinates; the first has ${dim}.`);
+    return g.map((s) => {
+      const m = s.match(/^(-?\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?$/);
+      if (!m) throw new Error(`"${s}" is not a number like 3, -1/2 or 0.25.`);
+      if (m[2] !== undefined && Number(m[2]) === 0) throw new Error(`"${s}" divides by zero.`);
+      const v = m[2] === undefined ? Number(m[1]) : Number(m[1]) / Number(m[2]);
+      if (Math.abs(v) > 1e5) throw new Error(`Coordinates must be at most 100000 in size; got ${s}.`);
+      return v;
+    });
+  }).map((p) => (dim === 1 ? [p[0], 0] : p));
+  return { pts, dim };
+}
+
+function geometry(ptsIn, dim) {
+  const seen = new Set(), pts = [];
+  for (const p of ptsIn) { const k = p.join(","); if (!seen.has(k)) { seen.add(k); pts.push(p); } }
+  const p0 = pts[0], d = pts.map((p) => [p[0] - p0[0], p[1] - p0[1]]);
+  let r = 0;
+  if (d.some((v) => v[0] || v[1])) r = 1;
+  const nzv = d.find((v) => v[0] || v[1]);
+  if (nzv && d.some((v) => nzv[0] * v[1] - nzv[1] * v[0] !== 0)) r = 2;
+  const geo = { pts, dim, r, k: pts.length };
+  const fmt = (p) => (dim === 1 ? String(p[0]) : `(${p[0]},${p[1]})`);
+  geo.fmt = fmt;
+  if (r === 0) { geo.lead = 0; geo.a0 = p0; return geo; }
+  if (r === 1) {
+    const gz = gcd(nzv[0], nzv[1]), u = [nzv[0] / gz, nzv[1] / gz], uu = u[0] * u[0] + u[1] * u[1];
+    const t = d.map((v) => (v[0] * u[0] + v[1] * u[1]) / uu);
+    const tmin = Math.min(...t), tmax = Math.max(...t);
+    let g = 0; for (const x of t) g = gcd(g, x - tmin);
+    geo.L = (tmax - tmin) / g; geo.g = g; geo.lead = geo.L;
+    geo.ends = [pts[t.indexOf(tmin)], pts[t.indexOf(tmax)]];
+    geo.norm = t.map((x) => (x - tmin) / g).sort((a, b) => a - b);
+    geo.a0 = geo.ends[0];
+    return geo;
+  }
+  // lattice Λ = Z u + Z (0, v2) spanned by the differences
+  const L = d.filter((v) => v[0] || v[1]).map((v) => v.slice());
+  for (;;) {
+    const nz = L.filter((v) => v[0] !== 0);
+    if (nz.length <= 1) break;
+    nz.sort((a, b) => Math.abs(a[0]) - Math.abs(b[0]));
+    const p = nz[0];
+    for (const v of L) if (v !== p && v[0] !== 0) { const q = Math.trunc(v[0] / p[0]); v[0] -= q * p[0]; v[1] -= q * p[1]; }
+  }
+  const piv = L.find((v) => v[0] !== 0);
+  let u = piv[0] < 0 ? [-piv[0], -piv[1]] : piv.slice(), v2 = 0;
+  for (const v of L) if (v !== piv) v2 = gcd(v2, v[1]);
+  u[1] = ((u[1] % v2) + v2) % v2;
+  const inLat = (x, y) => { if (x % u[0] !== 0) return false; const yy = y - (x / u[0]) * u[1]; return yy % v2 === 0; };
+  geo.index = u[0] * v2; geo.basis = [u, [0, v2]];
+  const s = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), lo = [], up = [];
+  for (const p of s) { while (lo.length > 1 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of s.slice().reverse()) { while (up.length > 1 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  const hull = lo.slice(0, -1).concat(up.slice(0, -1));
+  let A2 = 0; for (let i = 0; i < hull.length; i++) { const a = hull[i], b = hull[(i + 1) % hull.length]; A2 += a[0] * b[1] - a[1] * b[0]; }
+  A2 = Math.abs(A2);
+  geo.hull = hull; geo.area2 = A2; geo.D = A2 / geo.index; geo.lead = geo.D;
+  let B = 0, BZ = 0;
+  geo.edges = hull.map((v, i) => {
+    const w = hull[(i + 1) % hull.length], e = [w[0] - v[0], w[1] - v[1]], gz = gcd(e[0], e[1]);
+    let m = 1; for (let q = gz; q >= 1; q--) if (gz % q === 0 && inLat(e[0] / q, e[1] / q)) { m = q; break; }
+    const onA = pts.filter((p) => cross(v, w, p) === 0).length;
+    B += m; BZ += gz;
+    return { v, w, m, gz, onA };
+  });
+  geo.B = B; geo.BZ = BZ;
+  geo.I2 = geo.D - B + 2;           // 2·(interior Λ points)
+  geo.IZ2 = A2 - BZ + 2;
+  geo.a0 = hull[0];
+  return geo;
+}
+
+
+// Generators A − a0 in coordinates of the lattice Λ (so no bits are wasted off-lattice), sheared to a tight box.
+function latticeGens(geo) {
+  let G;
+  if (geo.r === 1) G = geo.norm.filter((v) => v > 0).map((v) => [v, 0]);
+  else {
+    const [u, w] = geo.basis;
+    G = geo.pts.filter((p) => p !== geo.a0).map((p) => { const dx = p[0] - geo.a0[0], dy = p[1] - geo.a0[1], s = dx / u[0]; return [s, (dy - s * u[1]) / w[1]]; });
+    const box = (H) => { let a = 0, b = 0, c = 0, d = 0; for (const [x, y] of H) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); } return (b - a + 1) * (d - c + 1); };
+    for (let round = 0; round < 4; round++) {
+      for (const swap of [false, true]) {
+        let best = G, bv = box(G);
+        for (let kk = -400; kk <= 400; kk++) {
+          const H = G.map(([x, y]) => (swap ? [x - kk * y, y] : [x, y - kk * x]));
+          const v = box(H); if (v < bv) { bv = v; best = H; }
+        }
+        G = best;
+      }
+    }
+  }
+  return G;
+}
+
+
+function analyse(geo, f) {
+  const r = geo.r, N = f.length - 1;
+  const C = (k, j) => { let v = 1; for (let i = 0; i < j; i++) v = v * (k - i) / (i + 1); return v; };
+  const diff = (k, n) => { let s = 0; for (let j = 0; j <= k; j++) s += (j % 2 ? -1 : 1) * C(k, j) * f[n - j]; return s; };
+  let s = r + 1;
+  for (let n = r + 1; n <= N; n++) if (diff(r + 1, n) !== 0) s = n + 1;
+  const n0 = Math.max(0, s - r - 1);
+  let a2, b2, c2;
+  if (r === 2) {
+    const d1 = f[n0 + 1] - f[n0], dd = f[n0 + 2] - 2 * f[n0 + 1] + f[n0];
+    a2 = dd; b2 = 2 * d1 - dd * (2 * n0 + 1); c2 = 2 * f[n0] - a2 * n0 * n0 - b2 * n0;
+  } else if (r === 1) {
+    a2 = 0; b2 = 2 * (f[n0 + 1] - f[n0]); c2 = 2 * f[n0] - b2 * n0;
+  } else { a2 = 0; b2 = 0; c2 = 2; }
+  const p = (n) => (a2 * n * n + b2 * n + c2) / 2;
+  let fit = n0;
+  for (let m = 0; m <= n0; m++) { let ok = true; for (let j = 0; j <= r; j++) if (f[m + j] !== p(m + j)) { ok = false; break; } if (ok) { fit = m; break; } }
+  // Hilbert numerator h = (1-t)^(r+1) Σ f(n) t^n, exact through degree N
+  const h = []; for (let j = 0; j <= N; j++) { let v = 0; for (let i = 0; i <= Math.min(j, r + 1); i++) v += (i % 2 ? -1 : 1) * C(r + 1, i) * f[j - i]; h.push(v); }
+  while (h.length > 1 && h[h.length - 1] === 0) h.pop();
+  return { r, N, n0, a2, b2, c2, p, fit, h, s };
+}
+
+function poly(an) {
+  const { r, a2, b2, c2 } = an;
+  const term = (v2, x) => (v2 === 0 ? "" : `${v2 < 0 ? " − " : " + "}${Math.abs(v2) === 2 && x ? "" : half(Math.abs(v2))}${x}`);
+  let s = (r === 2 ? term(a2, "n²") : "") + term(b2, "n") + term(c2, "");
+  s = s.replace(/^ \+ /, "").replace(/^ − /, "−");
+  return s || "0";
+}
+
+
+// The three paintings, from full-resolution public-domain scans on Wikimedia Commons (served next to this page).
+const PAINTINGS = [
+  { file: "paintings/grandcanal.jpg", artist: "Paul Signac", title: "Entrance to the Grand Canal, Venice", year: "1905", medium: "Oil on canvas",
+    where: "Toledo Museum of Art, Toledo, Ohio", src: "https://commons.wikimedia.org/wiki/File:Paul_Signac,_Grand_Canal_(Venise).jpg" },
+  { file: "paintings/andelys.jpg", artist: "Paul Signac", title: "Les Andelys, Côte d’Aval", year: "1886", medium: "Oil on canvas",
+    where: "Art Institute of Chicago, 1993.208", src: "https://commons.wikimedia.org/wiki/File:Paul_Signac_-_Les_Andelys,_C%C3%B4te_d%27Aval_-_1993.208_-_Art_Institute_of_Chicago.jpg" },
+  { file: "paintings/cassis.jpg", artist: "Paul Signac", title: "The Jetty at Cassis, Opus 198", year: "1889", medium: "Oil on canvas",
+    where: "The Metropolitan Museum of Art, New York", src: "https://commons.wikimedia.org/wiki/File:The_Jetty_at_Cassis,_Opus_198_MET_DT2166.jpg" },
+];
+const imgCache = {};
+// fetch the scan with download progress (for the loading screen); fall back to a plain image load
+const imgFrom = (src) => new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = src; });
+const loadImg = (f, onProg) => imgCache[f] || (imgCache[f] = (async () => {
+  try {
+    const res = await fetch(f);
+    if (!res.ok || !res.body) throw new Error("fetch");
+    const total = Number(res.headers.get("content-length")) || 0, rd = res.body.getReader(), parts = [];
+    for (let got = 0; ;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (total && onProg) onProg(got / total); }
+    return await imgFrom(URL.createObjectURL(new Blob(parts, { type: "image/jpeg" })));
+  } catch { return imgFrom(f); }
+})());
+
+// Loading screen. A small copy of the Grand Canal (built into the page) becomes a grid of dots; each dot's arrival
+// day comes from growing a set of moves out of the centre, so the picture spreads like a pattern, with a ragged
+// pointillist edge and a red patch of weeds in the middle. The shown percentage follows the real download and never
+// runs ahead of a minimum pace, so the growth is always visible.
+const Loader = (() => {
+  const el = $("loader"), cv = $("ldc"), g = cv.getContext("2d"), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let real = 0.03, shown = 0, done = false, gone = false, t0 = performance.now(), cells = null, maxD = 1, W = 0, H = 0, raf = 0;
+  const thumb = new Image();
+  const bfs = (cols, rows, moves, ci, cj) => {
+    const d = new Float64Array(cols * rows).fill(Infinity); let fr = [[ci, cj]]; d[cj * cols + ci] = 0;
+    for (let n = 1; fr.length; n++) { const nx = []; for (const [i, j] of fr) for (const [a, b] of moves) { const x = i + a, y = j + b; if (x >= 0 && y >= 0 && x < cols && y < rows && d[y * cols + x] === Infinity) { d[y * cols + x] = n; nx.push([x, y]); } } fr = nx; }
+    return d;
+  };
+  function setup() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1); W = cv.clientWidth; H = cv.clientHeight;
+    if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const ar = thumb.naturalWidth / thumb.naturalHeight; let pw = W, ph = W / ar; if (ph > H) { ph = H; pw = H * ar; }
+    const cols = Math.max(60, Math.round(Math.min(260, pw / 4))), s = pw / cols, rows = Math.max(20, Math.round(ph / s));
+    const t = document.createElement("canvas"); t.width = cols; t.height = rows;
+    const tg = t.getContext("2d", { willReadFrequently: true }); tg.imageSmoothingQuality = "high"; tg.drawImage(thumb, 0, 0, cols, rows);
+    const px = tg.getImageData(0, 0, cols, rows).data, ci = cols >> 1, cj = rows >> 1;
+    const day = bfs(cols, rows, [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1], [2, 1], [1, 2], [-1, 2], [-2, 1], [-2, -1], [-1, -2], [1, -2], [2, -1]], ci, cj);
+    // the weeds grow from a fresh random set of 3–6 moves on every load. The moves must point all the way round
+    // (the widest angle between neighbouring moves under 180°), so the centre is inside their hull and the growth
+    // reaches every quadrant instead of drifting off to one side.
+    const surrounds = (ms) => {
+      const a = ms.map(([x, y]) => Math.atan2(y, x)).sort((p, q) => p - q);
+      let gap = a[0] + 2 * Math.PI - a[a.length - 1];
+      for (let i = 1; i < a.length; i++) gap = Math.max(gap, a[i] - a[i - 1]);
+      return gap < Math.PI - 1e-9;
+    };
+    // prick = gcd of the 2×2 determinants of the moves; 1 means they reach every lattice point, not a coarser grid
+    const prick = (ms) => { let g = 0; for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) g = gcd(g, ms[i][0] * ms[j][1] - ms[i][1] * ms[j][0]); return g; };
+    let wm;
+    do {
+      const k = 3 + Math.floor(Math.random() * 4), set = new Map();
+      while (set.size < k) { const v = [Math.floor(Math.random() * 7) - 3, Math.floor(Math.random() * 7) - 3]; if (v[0] || v[1]) set.set(v + "", v); }
+      wm = [...set.values()];
+    } while (!surrounds(wm) || prick(wm) !== 1);
+    const weed = bfs(cols, rows, wm, ci, cj);
+    let max = 1; for (const v of day) if (v < Infinity && v > max) max = v;
+    let seed = 7; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const ox = (W - pw) / 2, oy = (H - ph) / 2; cells = [];
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const k = j * cols + i;
+      cells.push({ x: ox + (i + 0.5) * s + (R() - 0.5) * s * 0.3, y: oy + (j + 0.5) * s + (R() - 0.5) * s * 0.3, r: s * (0.5 + R() * 0.16),
+        c: `rgb(${px[4 * k]},${px[4 * k + 1]},${px[4 * k + 2]})`, d: day[k] + R() * max * 0.2, w: weed[k] });
+    }
+    maxD = max * 1.22;
+  }
+  function draw(p) {
+    g.clearRect(0, 0, W, H);
+    if (!cells) return;
+    // the weeds: a red patch that spreads with the picture and stays until the whole screen fades out together
+    const D = p * maxD, wD = Math.min(maxD * 0.7, D * 0.85), wA = 0.75;
+    for (const c of cells) {
+      if (c.d > D) continue;
+      const a = Math.min(1, (D - c.d) / 3);
+      g.globalAlpha = a; g.fillStyle = c.c;
+      g.beginPath(); g.arc(c.x, c.y, c.r, 0, 6.2832); g.fill();
+      if (wA > 0 && c.w <= wD) { g.globalAlpha = a * wA; g.fillStyle = "#e0473a"; g.fill(); }
+    }
+    g.globalAlpha = 1;
+  }
+  function frame(now) {
+    raf = 0;
+    if (gone) return;
+    const pace = (now - t0) / 1600;                                  // the growth takes at least 1.6 s
+    if (!done) real = Math.max(real, Math.min(0.5, 0.03 + 0.4 * (1 - Math.exp(-(now - t0) / 2500))));   // creeping estimate before the download reports
+    const target = reduce ? real : Math.min(real, pace), dt = Math.min(0.25, (now - (frame.last || now)) / 1000); frame.last = now;
+    shown += (target - shown) * (reduce ? 1 : 1 - Math.exp(-dt * 9));   // eased by elapsed time, so slow frames don't slow it down
+    $("ldp").textContent = Math.min(100, Math.round(shown * 100));
+    draw(shown);
+    if (done && shown > 0.995) { $("ldp").textContent = 100; el.classList.add("out"); gone = true; setTimeout(() => el.remove(), 800); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  thumb.onload = () => { setup(); if (!raf) raf = requestAnimationFrame(frame); };
+  thumb.src = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQABLAEsAAD/4QEoRXhpZgAATU0AKgAAAAgACQEPAAIAAAAJAAAAegEQAAIAAAARAAAAhAESAAMAAAABAAEAAAEaAAUAAAABAAAAlgEbAAUAAAABAAAAngEoAAMAAAABAAIAAAExAAIAAAAcAAAApgEyAAIAAAAUAAAAwodpAAQAAAABAAAA1gAAAABMaW5vSGVsbAAAVEFOR08gU2Nhbm5lciAgIAAAAAABLAAAAAEAAAEsAAAAAUFkb2JlIFBob3Rvc2hvcCBDUzMgV2luZG93cwAyMDA4OjA4OjI5IDEwOjU3OjE4AAAEkAQAAgAAABQAAAEMoAEAAwAAAAEAAQAAoAIABAAAAAEAAAEsoAMABAAAAAEAAADuAAAAADIwMDg6MDg6MjkgMTA6NTc6MTgA/+0AZFBob3Rvc2hvcCAzLjAAOEJJTQQEAAAAAAAsHAFaAAMbJUccAgAAAgACHAI+AAgyMDA4MDgyORwCPwALMTA1NzE4KzAyMDA4QklNBCUAAAAAABCbB9bqi5HyWVCzQDOYXAtO/8AAEQgA7gEsAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMABAQEBAQEBgQEBgkGBgYJDAkJCQkMDwwMDAwMDxIPDw8PDw8SEhISEhISEhUVFRUVFRkZGRkZHBwcHBwcHBwcHP/bAEMBBAUFBwcHDAcHDB0UEBQdHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHf/dAAQAE//aAAwDAQACEQMRAD8A1tD002WmQRpGhMcar8+eDgDqR/KuhtLNI5NsVrEgOQ+FxkEew5+pp1jaRLaRQXW1toXHJIDKODg9/fFbUEQdknLNCyEquRkt7464+tc0IrkR1cq5tWc5Bp9tbZg3MsLvu8sc7W9ScmtNrUxMIljMatwWJyMevNaR+yxyG2cfM5DMVAHryR1qyF3MVtZU+YfKZQSPl64AIP61tFXd2i2rKyGxW0fkqy25wVI8zA+b/d7896tJpdtawC4gXy5GyShGGx+HAqzO8EkMUjTMEhJb5tydMdjg49Krb7q/ZVt8gk5yWOCMdx2rZLqCj0RX8lbuIzqmwFgH4+9gevH5mqV0skMmZEaGOHcSrKCG467zyAK6lbG5stp2LgADPOP60t6j3EWGyU6cjr+A/rWMqiirtaGypdUzjFjXUHFyqwoynCbWLZU9zxV+3tLaBGedUIDk7duAD24BOKiksTp96Stw4knz8qhSigcjnAPsOtWbd4GZhP5mG2hiTjdznIwen0ranK8FI5pR1s1cmgtpDiedfLeP5lZTkFR04xgflU6eaLUXCYV93CKSEwT145ziq0tw80rbWAjBOBgtwOh9j7Vahi3TbTu8pucbiCfw7VXMluSqeupX3NYymKFREsvLyLz8x6nHFHkW14GkSGR5Izy0hOGz1wCcFSDVqKMK+2NWWJHOSztnHqfU+1TGNnZngHlpHkY9c96IVNLh7NNJNFeV7ezhSIRoseMGJRj5u3I6VTsjNNMX8rYC2VJ54XgbQf5irEKSoJNyCRpT77cDvjsamt8TzMzAbVXaF3bSOOeMAj61Kb1saOl1exLFsnkL3Nvll/2FYkHg8n9aiUGMsJz5jM5K5XoPTirYgR2iAGFIPQ9vYir0kTM6+Wu3aP4jwf65pt23GobNPUwWggaEWihVDZzgYyD1HPSon0+NSjRxRRuoIdzy2P8APvW09rbhBOYndySABkf1xVK4nkgugssJS3hRgys2S4x144H0NTbmegpcqsrFOHTIfLdEUT7+SDzu47Hgc1M2kRRxpLaxIkhGFyDtX2wDj9KfHdFUQWsR8pwCFQEt75IJH49K6FWSdvKwVkAywPQe2RxzVSbVghCMm7o5u4glhZJrrBVcAlc5OfUHj9apvGBHM25E3YC8g4H0rp9R3JHuWQNt+8CAMDtx/jXNed584khQEKSHwMYzUU3fWw6sUnowW1bzI5LZHfacH5R933z+lWVUK7G3jUEEMTnrj6AirgESoUUOUIAJLcH1z6UsBgMmVHGMAEZB9wKuctb2FGKUeUpLdGdj82ZAPm7cfUjFKik7XcEZHyqTzV/9zbBnlOGHReufWq0M0hBlQbWPAIxyPc84rnfWxvG2z3JEhWZWEwEqnjuT9MY/nUBjkFwJEjRSnEfYAH0HQVbci0VnnQNuPzDPIHsO/wCVVfMFxiDyh5K9OeoHPAPTms3C+5TqWdkyK6khsIvNLF9zHO0buT3I545rmZTJNPJcXqtIy4AjUcDPTPcetaoYPJvi3RLISArcMMcD7me9O+zxvOXmlIcjGdp+9/8AW98VpeEHZMxnzTV2V0BkZo8kiMbiVOQF9venCJRHG2CS2dv+PrmpZ4ZIcTo27zPlwvzZHqBUZmaZSnlExxHjdwAc/wAXGfwrkk+fWxraMdGRT24BUN8pRSSB/FWBAsxLi4dCkR+Vc4I/3s8Dit68voSCArFt3llwCcHjOB3x+ArOulO12lb5QBmULnntkdelTh6Dpp32M6tRSasRtcIH2+TvdQCGPzcn0PSuT1PTLNLo+ZESWG7ALDGeTwOOuTXUoxlkRcOqpzgLtBxzk5rO1GcyXGZYmkIGAVLAYyfQiuXEpOCTKpu2p//Q9OsVmMEP+rTBBO4fMeB3/wAKsSzGOePygJNxC5XHy+7H0qGFpJmVEKnCgEZ5FW0t4Xl8vIUZwcd/rXEpW1semqbRE7Syq00isvlk4LYy3v8AT2zViK5kQRoIsqw+8o7+vFV55ZopNuRt5DL168DnNEN0Ih5USBR6k9K3jzW2KSSb7lqO9lmk8uEBIl5yf4iDzVyDY0paE7D3CnGSBWP5kzZKvuOR2zke1WbaRnJjhIYZ+bjoPTPrW7lZCgtbm2Lu8y0Ejh1QArg4HPqO31qnPqcTQOI3JZvldVUtkemcY4qSCOWSN/NIgXOBk8MB3HJxRGiIJIAAYzg7lIBB7j9Kymr6W0K5luc+8sVzHHK0L/IfkLHawH044+tWULQmQXcDwIMbGJDbvU46ZFdCz2Ji2CMZ6AnnNV7/AMt4CzxeaowdvBz+B9KUZte7bT+v6/yIdJb31K0QtpIiWkwmeCcA4x69M06W6hWTEMSwrEv+sJGG9uef5VWjktEjkiUDyxzl8BST7VI+TtJIbHBKjIH1x2re+l0Q77MWO9N1bblCuc4JU/8A16dGTKoKhmA/gIzye/rimxvFGo/ebg57YGfapjMrlir7GIABBFSrrZDt1TJ5JJQ6uZG+Xjyhtxn1PGf1p9vLAyliAJWPKN1GaqQ22ZleSXzT1J6bj1qdiBIpKAF+Pl7Ur9Eacjd7l8EW8Pl43jOMjsPakunhaN9smCoyMjv9azZWO7a7B4VOAg4IOPWnQQDIQfI38OORiodRoFHuPYmaPeNysyfKdxwpHfHH/wBeqX2s7X85yQW2kxgtnPcjnAPpzVj7PHJGBcKWdT/EcDOeDgHtU6JsDKV6jrjoa0jWSWqMZUpN7mfEtwNp80GN88bdvB6dDkfjV+e7uY51aFkIIGVbO7A9DmsiW3jSXod6A8Buo+nTio4pIZ/3ochh/tcY9q0jVjNcxm6ck7FuZRezAzuQM7tue3uB1/Gr0PlR/K42IWyBnAP4YquR5aqYFLnGDj3/AJ1FJE+3bI5ZgRx2A65PTArKVRLQcly7mrdTRNb7oHJJ6MBnGPc8VSheFoRBLmSRiTuHH5Y4/Sm3KyJblVjE2e27Ax+uapylEtoFVHiDMTtHyn05wOKxlVXUJTtv+pcmFuQsM7KrZJUEbgR7980XkMgTzUxEMY+U9fQYOcfhVead/MJljdUQBd25cH8ufzqxCZ9saWqgQ+rOBweuDzk+1cjxMvsxuQ6r1u/zM9RKMoVQKeuf655/LFKlw8beWy5iUkr5Y5Hsc5zTry0eMt8zMM5J6HB/DrVRY4YWKxKfKxgdtxPUnNdUZQqp3HFySVnqi213emcOvlpHgqFxznp65zWW81zbTNb3LgK5LgsoIOewHXGPWmRHy1YRADB5bHQ+3/66tLLDs2ru3nnc3HX61t7Onf3Ui+Zt6sqW8cEu5mYJMowAPT8uKg85jcmJI3m2YX5m+UAHrg88+oNa62gWLdLISXHGBxzRHbsHy7KV/iznpjrTdXl6E+zcupz8iBmaW43QxsfLKoobOf4jnJ/KpWiSV22SsS7JwmVwB0BAx2q59lil8yGQh064HPTnmoHsZYSGVmO7lSW498D1rGrila7RaoO+g8wtJIRJIXAXbtYkg1gagkjTgyEZ2j7pOB+oreS0MSefC2Gfg7sD6nmqk8iRysrLu54PtXDXalFWLgmnZn//0fSLGdFhhecPHgYIK+mOeM9aurH5qmRJNsYY/dBz+B/nXPQxSXqGK5QCNR8pXliQM55PbtVtZrqIskkvykDauO3vjp9c1wRdkrGtKvJS95aGhHsBkXaW5/jyAe2Qe9TTlVURtGGVsLnrmsqCW+YmSH5gy43YwMDrgZqffJPL9n+ZQwILDPHH0wK2jJ31Oj26ejRc2eWY0eVQpYfKPlxjoAc4q3AzE52FASRhT6ng/j1rMNvHLtdEDSWowGb5jnHUE8Zx1NWUjm2mSKTe5wMDJB9vStOW+pvBX1ZrFw0vLjI4IGDj+dNljEieU0gBzwSO/fpzUcduqStdJGgZgFbAxuPHf2rQk3SESMRwnzZ9uwx3pSlbU1tdWZTbZG2GUbwuUyT1qowuJWQggK55DDge3vWgv2c7snYcDO7nPHSsclnk2oAiIRg7jjjkjAzWU3ZXMJ1eTRgbdWQ3EiuBGSSpGFwDxjvzUtvdq3zbSEXnOflOaEuWXzRLIoV2OARkkd6m2sY/kjD7+RgFduOhpLEty5Wv8vQ5Izu9CuMiGRVbOcglQAeR16mr9pFGkW5RlFUYPfOPfoazmaWPKwxkgqCwzySPpj9atxTXBjJOFD7T5ZG1h9Mda7m3KN0dKldbluNnVkk2bFX+Jjk/TjPJqZ59rtMEZc8YyRx680GKR4o/IYJJFkjzOFP1xTZZnjgQMq7nPzDk7uO3esGdSSdmiJmWRAFY7myRgfqTxVlcqheTLsCANo6HoazRdqchx5RPQD+vTip4Su0mSUFTg571jLR2E7FpgEYkE7Mdf89xVaSf92fKl2YblmHBP40lxPGW+zEb0IwWyR+vFZ0k24NCj5AJ2jGc5rOSm3boOM4rXqT3cysp8kEyMRkgdRj1qEQl4VEEYSQcspJ7dee5NNTcNhmZmaQ/KMZAHqf6VKkAhGcl5+QxGemfSqlONKNl+Hc5ZvmvqTFo7XywOJFQFx9489R6ZqOeW3leITsYw+dsTMAT27Hn1qt56BR5sW2IMQHxtJPbJ6/hipw32hndH+SHAbg5PtyOfwzXnTrSb0f9ev5/I5lrdMlVWghVYh5bSDl+uOfU9B6U23nnRZJGLOqA4kwCCR3x1Ofwqjd3sQv7DTzvLzrI3zcg7APvcDHXitGVSkWVZAM9PX3xXHK6lFy1vt/w5olo7dCikpuZHhnIkjuPlyAUKkYxx757U+3Q25eO4jkEUZxGgy3APUmliikjX9yCGzyzYIGfqelXfOkkm8uHOzHJbhsj09q1ck1e113/AOG+4zUddXr/AF/w5WFyJ/MRhIoQ434BAA9s/wA6bcQxykGFmaEjO3HOfUg5FSeZ1aLknnB5Lfz/AJVHECIvm2+WnAI7ccdKHiG1vZfj6FKm0+5mXCQFhGrbS2MHuR9KZLDcRJ5pI8sdx0H4Z5NWzZlHEsRzGFA5zyx9D3qQv5a/v33jOQAOVx2rqo4ianZfd1/UpwVubbzFt2CwMztx3GOPy5pEu0wziEO+OBk45/8ArVTVLlndRkQnklTzye+PWkLRW2WQFz94hfTpg16zd9zWO2xd2SkNLhUZgG2jOfpmpWcTDLIA0YyM54+hHeqsVz5gyr5CkZXIyv1qZA5ZpH3SIDkc5ABrz5vXlvqdEbETJdvMV2bIwu5SQCSw5I6dDXP3bxibDQuzAfNwnB9Oa6ieRoHRXkRhjO3puH0PeuI1QiW8aRwELc4bk/pmsKcH7zd7X/qxNeSukkf/0uyjtQwgdHcCFsbVYruz1LYwCTirJZTsK5GDjAyxbvzmmbAY41TJbkN6jjuD6e1UyuV+VgCBxtOc89/XHrXjU5z5rWLptdC7Lb20+fndOASsZ25UHOOOx7irEMkAlW6yyuVyoBwSB1GM4GKz4vN3bvunHzD/AA9quyQTPtCkAE4B6n364rsU5JrmRva2rX9eRbinihWSQIQrH5QcdB369D+FaFnfqoKrEuwN94MM/iDWG1pKZVfIdAMccn0/GlCwwvu2nG716nOM+1bczafMbcztrodYb+2jGXIVQcgnjr69qaJLeRluNvyQnIO4nJPt/wDrrC/fJJiRQ0TE+WSM8Dj6CkFq1w67ozG+fM4OBnO0ZPGfpXHOrya9BTqv7KNnUNnmKomWMNj5ff69iaqeUqvI8YO5m3Iqc7vX0HJ70xEkMTySgOYySynljt9qrT3DlT9n3GJ8AJ/dz6elZ3nPSH9f1/TOdQ525SNMssBjleISI5ClSM7S3T9agSRUnkMkmGzuClu2fQ/40huGNsIgzBYjtfaM/T6mqTSpJHjh1J+Y47elKjCbm6U1e39emx0KiubYupIyStll25G3Iznd7/pStciaN9nQHa+05K+h+nHrTLWKUu+9sqykKowPl/LqKsGTyJIlBLZXaEx/P1Pua9eKhT0ijrVKK16l2KTehRnydoIIOW/I1JKUkfywHR4iCGB5P4nPH0pjmQMklvEm9iNxxx06+2KWA4klm5LHj2x+lZOoir6aDFhDSl2XDdDu6Y+tTxnYJEePKL/dAwfzqFpYYFCAgE5IDHqa0f3WyO4wWK43ZPA9CRXHVqJbmM5WWm5n3FpFHGXYckcDPr7+tRxwhMz8HcMqoznr/Sn6kzTSBkm2bM71UbQR257VVu5zDp0MkoMnluuXZjnJPAGAM8c1yyxLt5mKqtuw5/PDEiNgduMjAx+HX8agaPZ+7gfdMcFtx+ZQffmr9wonQXaM7xjoMAjjqcdaqYMjfLEhwoCuCRx1+grnr80o2v8A8P5mCld3/r5EcDwyb0nbzpMkIMsPz7Gn2FsiXWyeRVYAsRnJyeeT7dqsoz/ZvOIVQGxgAljjjrkVXvr5LCzaUmP7Q6sI1dTlmwdo61mvac1lHXb+tNhvktds4i/ka8u73UluGkETRq6AnMYZcrgdMjvz712Di3mSBWIZZMFT098geua8wisLiIxCfcska8knjBG0ggcHiu7s72Lyra1lOEjC4fPJ7rjHp0Na46mqdeLclf8AHy/4BOGlKdJtJ2N4yRNKADsJyBkdcfyxUk0ME6qHYq33Vwex/nn3pjzmbekcigEdeCf5UizKJUgl3OAuQ3f/AArng4p2S8/Tp/SNZJvf+v67kVsoUPbhBtU4DZ3EnvTpShfJZRF6Hgk/Tp1pXkjt0byI9uDkKOD6Zz3NVk2bmE6nJ5Ads5z9OlChG95f8HzLj0iJLcW1qdgkBkI3CMtnB+nao54m1JIhsaNiuScnjHuOuc1Xu5JIN08aKEYDORknFMtrpY0xsPzHK9xj86+go4WCUZR6f5f13/EznK1r7FwKwiWPKsqna6g4JIqRGU/uSg4J+XqPrxyR6VnTfu2Ug4VGyhwd24+vr+NPaO8n3ySSIA42FQOSBz1J6/Srqxb1RtCotmQ3cdra/vQxaRiTt6Bew4/pVOG4nkhSAM0cyyEsqDgDPf296kmsftCrLcYM5+cgNtwAeKu27iIhyocSDliR+QHpQlaz3Zi7vbRD2imlieZj8+3DNxkD1BPFYV4tw02bVYWjwME5/oK6mM7VcSvuQ5Iyckgjlelc3qAX7R+7LKMdBx/KuXEStFJGsdXc/9P02OGXczAJhiCSMZJx61kkRxsJLgCINnaSuCxP8Ix14rTlGbfZFEMtkB87eR/nmsj7RKsaw3oMsqncvlklRweMnj8a8CW9kh/MkNtDJYhrMOrrngc4P+RVVZxNCt3azE+TwVJ43DqxPOa0wiiErbn7OrgM2QM57j3NRmIQo0kLKsa/e28HHuKPrLjdW2OhX5VFkKMztFJC4ICHLEEY+h9zVpXt548XEDAE98jJHf6VKlvHIw8+RyMEqBjbntz71CvnLJiXBP3VUn5dvvj3/StIV5VYO3Y05ZO6uWFEkcgDyOI8jag6L26nsfepDfJGWk5JbEeDyQT0x6VFFM3zRXKAjkqVOB7Yzzj1qTbAsbEggZ3ZOMMw7j+la4XDt+9VNIUru2yJxc+SzuNyMynnqx45z/So7a1MjxvGGjjc7mzgsT2z7D2qSSN2fCSM6nBYL2B9v8DWnCedsagB+HDDH+eK7IR9nfXc3pw5dWihJH5cIkO8MCflTnJ7H+tR2tkZyDK3zxZ/P+ta8SKoCtjEYKhc547e+aXbOjZUZO0hQ3QZ9a6G0jRWWvUq28achFO9AV3Hr9cU/wAuZQCybwg6gfMT0xirYCxtu243n5tvbtViWQ+bu25VhtGP/rVwzxNOMrN/0xc2uhTjkjjwS2wNyRg5yeKimuFHmiOPIjG3cRwae6sANsZbKgYJ64OefpTZXkZliCfIvLYwTk/4VreO4O3QZaIs0ubhFXAyxzwigZ6evc1YguLbUoBPGOHYoysAD8hwc9vpWTrc1tFpcjxXIiknGwBj9/8Avfht61keHp41tbvz3WNVIY+4A5Ze+K87FQlyqon1t+H+ZwymnU5fI6SKe1u7qa2O5Ps5KqCRhlAwcAD3rm/FVzNM0CW8yLGu9/KweqAHn39KWC6trONruVwYlL4bPJJbI+pNYNxLLf3P9rQE2rPtVf4mKcjJXoDWzwzp1brTTd662OOrVThY7yyka5sbd55isgiUttOAcgdfcfzqaO6dS0JxHGpxkNltvY4964nTNTgth/Zoj+VJDknsST+eMdq7IPaSqrqwK9CRwd3TFePKcZz+fb7jtUZKCZPcahaWVspkkCFvljzyWY89K8/luEvI/tOos8xVxuY8HLcYUdgBWpq1z594LWbJa0UMMYIDtgjOPQDk+9VbTdPIu8K5hVgdvyguOT19SeCa+kwlGNOnzSWr/pHlYibnLl6Iq3Mv2u3kj2B2gkUOo5yowc/lyBT9Pc7FkRFIjByD0544HYYrRVLcyTSQIUmwQcHqT257+9Ysds6XzbCyh9rspOQVHBA9CcVx5nFOnfXp3aWqd+tvX/gHZgHJVOn+e+nn6HVW8qeYFm+eNTtDdMnGeAPyrcijU5kfgnpnrXMoFdo5Xg2ZPy/NnYO/Tr3rqg8KrHLk4I69M183RqznFcqu726/8C56dakoVGntuRSLDLDnBz2z3weahmkDyrIU2heBg9frU32iGR2RQgTGRuOD+FZElzIsaQxptklwFLdcetezQw7teS8/T+vS5i3Z3Lc0ybBwQSduPXNY8srssUYiJYt90d+ev+NWbjEogLbiUOODjJHfngilZBK3IO88gdue3FejRiqUNHu/6sJrmlqMVmmc7nZSjfdABAx2H496hEzR3HlHfgjhuOp9a2FgaBBnahwQQKme3QKXZd7OMAt2rndbnnaKZrZJanOlC3MvPoR/X2qYWYJy7HCrnCj+VXPs/lHEibgB8wHIGR2qyjKjKp3EMAAGGK2jLZdWHKUh5l0PLkHEWCuMjP41j3iQmY+bKUIGMAH+ldIYZBjc42oeg7Vymq3UFveMs8oVmAbHJ6/SorpuKSBNdT//1PUXKFCq+ZEGXAVMYPPpVW+SyMKW8alnK8HB6js1akEKhIRImZZefU/h3xVS5SW3nlGQVkAyXAz07V87J2Tdzbl8jKeKeK2SNzHIW556jJ4ApwWVVUzREBsAbDkfj3rTht4YpBJ5heVx8gI4/I96nNs5OdxDZySBn9DUPVXW5ajqUBAZmMSSbV252nORjtVTYSh8oiVo93A5OD1x6kVvwrKjOsn3AO4HfntUgW1IR1URs/OFG0Z/+vXTTbp6m0HZ3exkQ72RcxsSw6kcgVKiC32oMMg6hhkA1qLthllEMr7twOwg7fzP+NN4lDvuz5oIAA6HPXH4VUsZFVLLp/X+ZspPdjGSCIA27fvHwWYHAAHOKcUUTASDERXOcnr3JqP7DnarqeM5YkLk44PuarRSzvey6auGSDYZHc5HzqTjPHcelc+KxLk48l9f6uHM5XfY2pBAImmDbD0+U59Oce9QNOzKChk2SAfeGG57kegqNvktlUqC5wCBkj2NJDazrbGSVRIoUhgrfwn64rmhjGm4LV+WuvUm0rJ3Lkku23iAQyEtjI6AZ6nBpsNqYDuT7zsWY7j161FCIEUBAVKc4ArTlPyBlYv2989K53UlLRbdfkNRS1ZkskiDyVb94zZAOeM9qtKqoQko5AGeo7dB61KqQPJJIQA44HBzgj2pkULR7REPkHAzyaI1eeN1PyXy9Akmnqjm/EMAeCOYIoSIuMt95U2NnH6VQ8P5mNzI0QJeIcf7PTI9M10viG3tWgjnkUqySbVY8AfKcnA4+tc7oE1tBZ6hcu2V2B1Izglcjjv2GBXqNS+p07vVS++5zSt7XTszj9RvPtlxFC0jJbW8YMoI/jwOCfXkfrV22tGiCtIwMYO0gDgHHAHv61WGj32rPdgjyobtgwYdQBg5P0xity3069hkDiXdGrbgpAC7mGB26nH619LiaEm3ZHixd3cxfN8tZHWP7QkJYZcEOoAyD27mut0G8lu4v3rDeB1Zd3XgEjr171l3CXIeSKfDqHyV3rnLdBkjp6fhUfhm6kjvpQA254WIUj7oz1J9M5zXzGNwWIjUjWgtOvp02PUw1aHLKnN+nr/WhS1W8ZtduZk2hIwIjtJAcjhhzgA8Yz6VZtZVikENoRHF95gw3Ak4Jw31zWJq17b6teyXbRZkjwWEXy4CngknoSamsL1hCGEDSo6yy7C24sIxxz9e1fUU8NJUYJLWyX4HmqdH2knUb36HSySJEy24lxJzglSQO/pnODiqU1xNbIQJg7KpOSuMcdSffNc5PrF3JHH5tmPOWYIIy5A5Tfu3Ac4x0pw1ZHmhha3MTvC2UOfnZhyd3QD29qznh6ltV+P9aG8cVhtoXudMb9LUqzJtiVQu8A5+cA5C9+a7gRXEltEbfG11Bw3UKea8ys9RjtLqKB0Z2gKuhL5DuozgqfTOK9Ptrpbu0iuwBE0pO5WPQ9Np9OnSvkpU4YWK9nGyfvb6W2008j3pS9rLmUr2026lOWELt2xAOBhjj16kd6gVFdWCruKjgnuD9a6CMuqj16de1VTCqXJLqBhcHHv/AFrqp49WXPovn8iHHU551iikDsgO3A55ANa0cBjCqrHnuT/LHSrgjiEZK/Ko65GKgRdkfnpv2N8o+vrk1zVsY3Zt3W+n/D3/AARcY20QR4X5ZAobsCcmpgZdyk7WYn9O9RsS6B1AUg/LuxuY+/TimpMzOYhGjuo4I4APfmvNeJk5K6euz1/r00L5Ooku4TNEjAs2MLjpxVSTEjhiN2Pl+hqQysQY9m8qSdxHzDP90ineYBFshXbvP3SOciuvCY6c3yze2vy7dnrpuhyhy6oqTSPGCGb5Sd2QMcivNvEqalcagstjOsEZjGVZN+Tk85+mK9QETNlWwSCcg8getc1qVhI06khGG0YPtk16E6zkua+n9eZFuh//1fZpPLSOM3LFdpBBHUDv74qv53nw7iwCPkhgvPfA5rIgkluf3kjb2AGd3bHYVoLcJI/kAAZyMV5nsVZ9bnakSWksiPt3eblSS5ABz6U+SQSssyoN3AP9KRgAwOPLXaUwvPNRwWsyIFLB+7ev1rLDUrX9pqGnRE8TABpZMsC2T2GBSsqMQxQZh+ZPUd6SMsMifGxR+Bx3pxt7aS3Mu5nj2leuN1dtSEXG1i1LQSOW68yRrgsoY54xjjHY59Kk2GWcy4ba2NoyB0HXgUkCxiNcNn5QcnnjrzTY5hNcNj7okEW/pztHT2zXkvCuT98Oa2qLUSCBQJiSgPGedua5HRb6Ya/fQSAzfO+HP3WVcfKo7lAea7C9uLWzgzMCchtoGSWAIz/OvMNI1JjcyzziTfHl4zg8E/eGR0LDGa3/ALPlyupd6f8ADeWn/DmE6yjJQPUbgBwTHlYxgnZxkDtjFII5mhKwA4wfvdFyO9V9J1SDVLNJ4twB4ZemP8ao6l4hsrHdbKGeVWAdV4zkcZPpggn2rz6eGlLEJThqvX+rfqdLmlTunoynf6tPpttZGGFZpLguN3JVQqg5/Gt2xD3KQT7Vj8xA7HPUkfqK81TXJNQewtZAsEVsxjXBzvBQgA/gMmum0bxVplxBHBcsIWRdmT91ip4C16WJwLVKPLD3r629f6ZjCsm7uX9f07HViErI0gfGe5pWnU7URgCc5xzWRN4jsYR5txOkew4bZyRxnkfhRD4l0Ro94k3hgGwAMhXIA49QePavnqWAxEkuRNJ913/Ffcds6sE/e3DXyTaxMWGC5+XHU7DjPtWN4YKyrdRMSkaJ1Kgjvz7Yzx9Ksa7qdheWUC2K7ovmc5Hzfd5H15rioJ76RLgQyeXGyBQi9GCsDz+dfT0sHJ4SnQm7Sv8A8OcEpXrc0NdDqrK/sY18oSorOpGxuMAKABj3Byap6/c77IJbyFVbcVcHGQmB0B7dq54abZLule4KFovm2jkEDHHfoKmmsLN08tppPNBKKMdSM4J9jxX0EqlK17nC8JWvsvvLWqultZvPOFG8RxiQcsSFB3H/AGhgfzqHw9LLZ6jbyXbCOOW0KyF+m8MSef8AaXr70yX7JDBHNLMJ/sv7wo56Ps24z9M1zV/IgiXDGSeNFVAc7AGyCSPUbqc/Z1KPsm99Dnlhq1OftLFozQXEtyiyJbwXPLJnG5fM3Z9cEZFMjkmh1nTbG2Kqnl3GXAypGwnH0PTHtVoaZ9rKvcxrBOiLES3KyYyFZf5YrVtrC4tJYmnCTnJXAG0bW3ZOT6ZqvaRt8v0scck2/mYFxeWxsy11czII5l/eHbww3A7O2Mg/hUGrpcXK2vlsJDIhyCBuYnK59hzzWcNGsWh/4R+5uZGxIJ1JX5cIGBAYdetda+mxC0MsTsZrOMBNvdcDOM1NSpCM1b8i0ouN1/wSrpJRWK32xZYo4yQPvKQffsRgZ9a9A0W/SW+lklO5HH7tM/dLMST+Z/CvLLQ3ssQuo7OSZHjCmRjknbwM49MDNa5uLm1tkvBMWjUNHuVcEbhxgdR1r4rGwjTnzp9bb30/S2tuux9Tg3KUHFr+v+Dp+J7XcFT5bZyp9MZ/Cs+QDzQVl25OAQ3X2IqrpOo29/p0rKN0UOFAGc5weefrVp4xIsWzaqk9+oGPbvXi4iEpTso+fU6Y2S3CVZjE6SruVSCjemOtIzuibRlgOoI4xjPGKZLCZDtZiOnIOOlCLMkwWTBUHjbzkms4qampRT7fj/VgbVrMrSrNJKgKkIepJxinC1UbtrMMHrn27VV1HVLaCUQzypHsdN+/uG/yKlS8tLny0tW81ZFLbg3THHH44rWOEndynG6fffa3b5ltu10Wg27BVtpxnjtjvzTw3mTtEpPH8RI5x+FRAwkqARtTg++O1P8AMLBvsybdwwNw5ANZc8oXTet9u+nT+vwJ5b9CJpYjIIssX64/nWNqNzCZ1zEzYQAfMBj25rVLAOTtxt45GMjvzWHeS6M02bhWL4/Ss3i68W02t+un4vctRi9Uf//W7KwuJWEkrR4R2OMfT/69a8BQyI24ZxnP8q4uyvo7SxAyzjqpPJO75f5iuq0+X7Rb7WQoVUcNwcdRXmpTUpKe19Drpz5kjQivWkYgfdIGCOuaeJSB5eeWOD688iqYkjdneDncRgj8OalhKlmcggnjJ6cd61i09UbXReYqzGNSRhR9OTiqsE/lRKjAnCqSByOnFV1mZyPLbHQEn1D8D8sVnmdlaMZ4OxQD3O3v/OuD61rr8jZUuiNm3uQqiMMXwi4JHb/IpYpQdiBmP74MuOMtjp+VYQ8uGIXHnEMAqEdupz+Yp1vcMhtnLcCdQVXr908fh/Kt8NXU5xi3dtX+RnVjyptnU6rO76RMwwsrbQmf979OlcL4e1O+j055pQNzTr1AwVbdk/pio/Fc3n3MUbn/AF7IqbGwEUjI3D8c1Bol94du7G4jmglmijmCusrYIZBgEY6LxXsyouVKy6/geZ7RubX9M7LzzBNIFICmZguOm32xXCavFdTa9cRWh3LHJHId3IVimxhn2XnFej22qaddQroCwbVVV78qBg9fbIqtcaHoyXUl6SfMZOF8zAbHBJHt61jKah5Pp+htUg6sUuh5fJamwt1A/eSW8BulYL8rNuZCM/3iD09K6ZPDtvHYxpPMyMww7KRkdOn48U/+y9OvL37HrbyLGgwoRysYUncCR3DcYNdwnhbToo9kckm1eSWYMSD/AE9KxoYuFRXTtLr3T7GtHDKm37RXXQ8wt7O3TXXKq0kUY2ksPlbgcn157/Wp0fThetHFEBtjbzWweUBbGOwyea9AtbS3sbmbS7ZMou0jdycMMk5PvUkcm+aWGNUyh2tnHTqMj3HSul5hbRpsHgk3eMkk+h5xbyKLjzY95tfspuApBJ3A7SP0q2ZJPJXiQ7iBwMdFHt3PzD3rrHuTEGaBQXlUcAcBQDg47ZpTeXUln8jKH3oVBwd2WHOOuOcCvMxFf2tXex3UaKjTUU/mco0cYeMSTShmMQXAAJxw56dz19Ku7IZLlhmfa2UX5cNkA/N9OmPWt69uZGIEkyqFB2k4wzNwFGe9YmpXOrLeQSwMSTbszK2OCMhf5/pXJZWu3c6k9XFXM7WLC0/s2eSQsDAFZWYAZbOCSfp2rj1u7mC2EoH2i4dpHxjKgBlCj8Qc/hXUa4byy8I6iuogOpQYRz1ZmVTz1zjP0rgfDupqLe3CglQojVcHO9yWzn0CkcUSzGphKVOSjdN2fdK35nn4iFOq+STs9zsXSW4tyI2eVkkUurDnYrc7cd+h96r30EtzFH9muZJ9xYyZboNhIBA6cjFb15bXCxtJauNiIXcqRkNjg5645z7VXtkllt7WSGQ2/wBpcGTYASSFJI/xr66ErwU0/P8AA+XrUrS5Wc9aG7WNbuWAsktvuKjPBXI/DcMHFSC6aKe4swzQxRmEqzZwQzfvMe2KSxuNSuZ7TTp3kZ7yzN0ZFbGGR9pTHYE1JaSSz2SSuzumJHYPyQoPGT6AVjVrpfEv6/zIhBuziS6JcTi2e3tyBFFelBk/8s1w4I9eSc+1aurXXkQ3VtuKGMqwKkMD5hOB7YIwa52KG6tbN1Ybo7m4VbYIQSSwU/N6crj6GiR41a8gZ18x5Q0q+rtnA/XH1rx8RKF6kkujf5HvUebkgm+36np/heW4GnOCR87gLtA5+Rf61n6hqd9JefY7dTAOcsCCWK8HPpjIrkPD/iC50y3XTvJ8xYkLg5yVLKcZHcZHNDatcXDTS3URg8xmLKuCQCoYDP1FeXDBy9rOpVheOvL1/DoenQr05JLrZXIZ9e8REeVDcgzByFwoywGTke3FMk8Za55TTeaGlMfCYwN3t9ayrXUHmcSm1VZIcpnkfdyMj65NV2gW9ia5mnELTH5QBkrjkY9D610yp0+TmlZei/r+vU2cqaquCX3/ANf8OXbiVZJ2ZY3aOVisrHncoXBIz6E1o6ZqMqakLewkJARxH22qr7ck+mP5VBBHdhzHFESp5YnBO8dfoDxxUdjYNFIwjbEmxoY1Xryd2fbFPESpxpyb/wCD/n2PLwrrSnBtO34P9D0Wwvc2kr3jBQWAVjgEsckn8xgVtxkxptRty7dwcHnBrx3VG1K3jWG4TzWTaQy8rszkkjuc5FdC3iP7Gn2WMEwzqNj47ryfpXhYrA+5GS+Lv3/4c9unaq5cn3HSX/iOy0qSK2nlaf7QJAW6lQgB6dzWM15DeYlWcrxjBAyO/wDWvOxcajeXRdQAu9Vi2jcVLDDHJ65PX2rob2yjjmERXeyKFJHTIFcmPwCpUaTlUd32+8xwdT2k6kZxs07H/9e5biS0trr93jyo1YKOTlnwSPoDWgtzcyAJbgoCodm+8SMYP5GultPLnht5bcMxlySwXgg9ATkipXtYbdmt5xtdl6jqRnoQPXHQV4FRVKlVVVLun934HVTrwgrcuhzti5jUWsUuJieDnOM8AY9uprZWZhCYrmYDG4MVPIIOMH61LHp8LzrcKi7kztAAHPPOT7Vi2N7pN3q11bKFWdZNkyspILjrj6UQp1VT5VJ2X5XNZYiDlflNFTCk3kM2S7pjnsX5/ICqwuljX7S21hu2ooOST7fgK0ptHsopNnnIvlsZNwbLFj1BHXHtVhLK2eMXGwLt+4SAFP8AwE4OSKw+rNqLu/w/rR6l/WldqxkxPDLC6k/PgfK3YEDOfpWFNr+npZSSqShtpH+Yjo6jHT0I6exrrLewV2BMYcScMMgMo7EgnpUUvhy1KyQm3Vix5A7A9G5OM8dK7sEqVGp7WUW7pLpp5d9X012OavUlNcsWcnJq2l659luLViEUGAPt5JGD0Pc5AHtUMUtmdNuZnt2RXmjjcKPmPzMCzfXArt20uSCIpYpGmzDFmCkfof8A69EVnPJKtkGaP+NnwNpJ6DPt9K9v65FaJOy8ziad/wDgBpT48SNE2T5iNIvHAIVAfzyMfSqEMqS6as93977JcvnHPVg3P61tJHf2syKkvmFTs3FTgZH0GelOljlkgNvNJ5okGwKFCjHcg9ee/FebXqKSWlv+B/mdEZXZyst7bkpOXzD9itxHu5JYgjB/DrVvVdWtNOtbh9RmdPtEFuIiucu+SdqY7gKKs2+hQqWiI4HJG3G0fXucelZmpWtnbeJPDFu7M8Mk0xjDnI3iHCjHsOlePQoRhiZVW737eSf42X5ndVrRnSjBKzX/AAxbTVr+81SafUbd7K3SBVAzuPXhsjvg9K1La/tftt68JEoKxMjgct8vJJ+tS61qDaZos2oi3Nw0TKPLQgbiWCDOe/NVJLO2j137IgUxXdqHijUhXQwsA/TgghgfzrvlXi3zNNL1/ruZwdkuupS1LVI7e6mkRMRygDCD5x5YG4HHUHPFZGo6pEl155zuEVuwUDDAo4Zx/wB8jFdkuk6YkpnSELLgqpOc8/rzVW58PaU8iqY1LKncnHGOK5Z4qirTSbvqtdLa6lK+y6FG81uzvWt/IijuWWRXblchMEnA7Hpz7UPehrxbl0EYEAKM3ILnLA49hxirieH9HMrOYEhlB/hyAwXpkj6mnT6bbNKECs0oXZ8vQZPQdfzrCpi+VNQhZ6WTf5/d8zppVLe8/n/XzOX0qGPxN4ek0/eSLpyjyMMlJNy7856cjGKhtvA5truAS3W3yJBLtReDlNuD+ArR8GQRQwa2yMWtW1RljJBHRF38cn7+fxrdOpPHe6hZzrvFvDBJGQPm3TeYMH/ZO0YPbmtZTimqLjfrr0urGUXT5VOS2VvxuZ66bdTXmtrNF/os2yK2KEZIZf3hI7YwKxfsF1ZSW1tCGe1Ub53H+sRsYVVHvjmujspNIF5cac0oMgupFUf3QFUt0PPJyD6EVi3XiUR2l0rrGZLW1nvC7ggOsMuxR14yOD3r1FmUub2ce234epx1cPRnHmmnfv8AjqZOlwYuIo8urwRmIAjDEEk5P0J4pmkS/wDElgnCM9tiKORTy5CtsbJ9z972rvZ3sI9LkvXTzZY41mVkBznIbGT+FcBCscWj2ejqzqtzeXrqy8fu45HwpPoXZR+NcUc0Uv3ijpr+G9/uJeDjF8jk9F/wxq2ul6RYWRhMgJe4M6HcXO/cCx9ggPA96mm0bT72J7tQXlkeKWRsYYgHevHbk5xXPeOryLT/AOzpViiMEF3CszQE8lsh0Y54+7zx6Vs3viX+xktpbhXeWQOs6qVB34yu1e+cfgK5a+LhUWi3v236+R3UmoLllqlYrHTtF8yK6iuJbTPmRlUbdzk5DDvyefTNVZdFns4muVnS8LoolVOCS42g7fcYrKstX05de1CGVxGsss0nzHJIIkOQvXqAfyquPEenpan7QUj8qwgLsud5l5UKMcEpszj3rqWLnGPLyuys/v7WMuaC8n/lsW0tL23iinNvL8qKm3aeCpAJOPpWa7SiNtls7Y8wbQv3jyQR7gnB/Cq+jeLrm60i6k8yUPeS7bcDJb5GYgkc4zgZ9qht/GI02yvHuHMs63LrnDfN5qKr9OjbuQPaul4izdNUmv8Aht/01PPlGM25uf8AX9amvLf2d1pttFG7BpGjTzM4JZ2wN34qQasaS6Nq9nLGDH56O/qBhWXr35rhB4hWwtbaMW67WjUyuVyYuspwP7wPyj61abxcftl5bJbPFHEES1TAZgP3jDkdM/KMVTxc3BqFN6/Lyv8A8Ainh+WpGblt/VjvptfSBIZthUGZoQp5ICHBP0z1zWBdXFncaF5VzKGuI9QKofu4ZlJXI/ujPJ6VycWowiOJ4b0KjmeOSKQZO+Ubi49sjbzjk1Yh8XwS2htZbMCdi8fzqoAIBHDHup615HsKjd1G/wDXme/DMVFXSs+5I+t2EEwjVmeaJhJuQHaAADt+obIr0q31FblWkl2btxHSvFP7RS41p2S1ktEmY/e27AXVtuWHTOScetaL67rNssYkuyDIgfCr0BzgYHTGKxxWW15xTopx/r+tR/2pFyaqRu/6/qx//9D0cPc/Z7e1kjhSORFwybiDn2+tNg12G7uLvS7FwZISY9w4G5RkqD6jPOKbZQ3KhpIA4GzcF6HBH3QOleRaRqca+MNZ1M+c1qLjy1UFflkACuQByRnrXm0483Mle9rk82zZ7U2UtVa725iBCszglsck8f1ryDTtd0658UHVLbdBatJub5TueUqV3Z6bcfjXSeL21uW1h/sqyik06aFzKUcrIp4+bI54HavK9Lv/AA/bB4ILy4naOJsRH7rv0x0yOcEE969DC0E4yk3vpa+opt3SSPpRLG0vYxPFwZT5g6EN75FTTGRFMbMH+csFfsvbH0NebeBpbm4WK/QznSvJaIRyEkmXdneuTzjnJzzXo7Ibh1uGdZkQbFPTGO3FcNWnyTte5pF3W1hzRpLOrMUX5fnJ4yD+tL5bpCd8gjA4+fGMdsdqWNXFw84RZQQMAcketPY5QM+5lZiTHt/LjrxUxp6f1/Vwb1ZDLHcW8az4DhmUHaQvPTOTj0q2S8aHLjzGJK7VADZ9TT512DbLIHDsrKHXhccDFMuJyJEQBW3+vPFS1bS39IpLd3K7xzgxeZKCQflUHpwP85rE1d797K8bSFBv4o/3bO2FJ46e+O5rTnEDXCugkNxF91c4TDde/OKrefcRQtcSwqx6bFYD8N2KtSVk0tyEtbEGh3tzeeHbW+1Nj9qYOJTGMc5IztA4PTgVjeIIAviXwrueV3jnlKgLkECFidxOcHOBVrQV1BrnWrVnVEjm822BJbCMBnjPTP5VBqay33jbw/YRTeXJbQXF3IGH+sGFjCj8SaxSinypXev9devQ01vdl7xaNSm8P3kdlIInyjKTyQRIuBjnrjFXNT1C0t9f0ZXt2FzL9o2Mg/g2AMD6ZOOKq+LbeKfwlqZllMJjUsWQ4KmNgTnt0z+NWLiXGqaKrqXRllHmZ5BEY2g+pb1rzZRkoRSf81vw66v5Jq/yOtNNa+X9WN5bV3uY5Sx+Vfl7ct/CfUjHrTblQiSSXzfuoxkv04HqB+VPaXyuF+blWO45IA/lXJXF281xq2l3cjpbTIzRL1ZsH5ivXjjA+lEEqzetlFK6+dnb0/TTS5m/cW12y5uFx5kquwV23qw+bIPQVlDVdStdcvLErugFibmAgfekRsEEnptAB/Gs+z1e+h0rTriPyobbzGSRXbLFFcIAePvDPIFTakJrjxPpHlYkzb32DnamQq7Qw7g9D7VEaFSnU5Zu+krfJ9fP5fqbKUJRbirbX+7oWPDMcNh4M0+8vphuWN7qVwMs24l2YevDc0zVJYZ/E2k6jY3YmijgRpOcIySyFYjwOTknv2rC8hrz4fWVyFVZrOORdnJyBIVYEDpwucVzcWuC41awtLWKJG02yQyq7BVklR3Mac+jHPtXVTw6cZ1urbT7Lt/W3yOdzd1C2lkdRey2tj4od/KPnrdTXDiM7shYIfX/AGTnGe1ZF9MmtWGq6XbDypDa3VvEj9Zmlcvwf4QuP1rnLPxdDL4tsLp7aW3jjbdcNguS7w+W/wDD90CNfzqrZ+MbDSb6aTTInury4mmYZYMVDrtVMEclcc49a1hhakbtwfMkrbb9v87dyHO70asemQa7Hq+ltpbgW0J0iOcSeZiRyVI9QPlK849a820rxCukbLyfyVgK3UlqzEszu1xG7LzwAMcfSsi3utHa8nt9a0ieQs5ktT5m2ZLeViXUr0IV+g9DWaLbQp/DEOLC6mvJGYxScBE3TdOfRevPWtVg5tuLg0n5eWtu2m9+5Eqttbmlc6xFH4W1SzS7glWW+lnjfJMjlJGAJXB6jBB4GDVS48QWMuqQG8HyQuJAzHJMm0Ic9xxRaReGJEkVkuY5BdSpMNvyNbq7BUJHUhfTuKgubTw7cXurw6ZE0qR2kctsZBgBskSHHBPt706OHSb5qcpPfXTytv5+nUcpPRpoal1b3c7RiKa3nkDM0m5WdzgjYSeFXHbrUNv9lh0ra5ASYHcFcBd+QepzyAKy7ieCS2inuLJjMlk8UpU4xIcYk7dO47Vejm0u31qGCy05pVSHabeQ7lZ1I+cbTwTj/GvQjKcH7tHz6fdvpfp2MUubWT1fqO0nVIbFbp1++W2B4lLEHPBPPGevFWJJ4rjVLeKNpjlN8iMMKzAZLYOPxzVCy1HTTaTJBBIt/eXILfIcKF+XYMEEcitmCxspZjcTlXnSCPfHhiQXG7aRkYCjGc+tdabqRcXC39dLGKjZaf18jMlgiDzfaZ2kt8BAEOcqw3Hk575HFXyUkvTf2DpLHMqMYM7iHUkc9OcEVVlvo7HVYbWaSO1hIZXaJNnyyY6DkYXnH1raFnp0eqW8dpPDJFFbNL5xGfMLsoUll43fL3xj0pzhazT+W50xmlFXV7fLzMV1tbW8knePcrh1+zSOI2X5iyliezZJGBx0zVGa5sET7KkgmtZckwq/yqz4YqGxu6kjrmtrUdKtfEVzZ+Y5i853DTt8o8xYgcZI77c9O1Vr54JpNJtHRXAsmjVVj2FpOFzngZxyDRTpSv8AF/T/AK/zJlODs+Xz9Sp58EVrDYyIksNww3yD7ynftXfnjIx0HatDXdVsba5iaC2S4jmiDqyMVAG5lxgY67c/jR4Z1dYlktdTggW2gM/lvJgfOcPHwOvQ1T8QW1hevYz3cwhkNnFkD5M9Tuxg9SadZWp/P9CbJy2P/9Gbxn4i1qy/s6OzWZIpZCbiWJSV2EbdrEcjGd2a8usF0nSXefT7+OQMd4KKZGZs8hcjHPf2r6XsbOT7OY5xlZI8AEjPzDB/Cvky80G7g1+60a1ikQWlwYQVOASRz6du4rnw+KUItOO3X/MPYOa3fp3PZ/C0b6sbu/snkjghysizEgv5i/dAyRgD8uK8H0/R3tLtmRwyDMmQMZ2tuCg9ckDoBX0B8PrbydJvdPWNjPuRZBn5kG0hecjkgfnXjNje3ljfTaVPEDLbTyIr4yyfMdwwTjviuF15VPaVbdNPk2dkKUaMlTnKzT37H0n4VuFl0i0a0URRlmG2PJQAnIP0Oe9dJMlwIXhfESkkgpgEe9cz4TO3RLZYo8RlSo/vAg4yf1roy8kOJkwFA2kEZyc4HNZ061uVXsyaifNJ3v5/qW44Ly4s4ljw0fAD/wATY75z1qP7UbMK8pJO7a5UfdHY46n3qCRkjjiaSXythOAPmw7dACaj824mAiOV8rk9DuGef/r10urO3u2tqYJ36aly1jubjzdjrv3HzePlJPQgEkjFJHF+8TfIjLGWXI6DqQD9M0rSLGh8oOrsxyWAA9iKjQO8TsQFliPzMPu+xwe9E6tRu/8AX5BHlW4bc3IZZkyc5J7D2qlGgEjyJGjqc/Nn37Vdh+xz/Ky7QOCSOMn2xVSJHuLkQK7KsZ+6AMHPv19al1p8rt+X/DBdXVzI064L+NtWzG0MMFlGrFj8ju7BjgdiAAKg1B0s/Heg6hGA8V1BcWbAfwucOhPt8p6c1V059QufFetTSbVsoFS3hwMln4LMee2Mc/hSa1epceK9C0G3QGWPfeu5PChFIGOnJJ4FClObV7JNbfLr/kEmo6RWp0viq2upvDerW8OxneGRQrAYcEcjkAciuftdRkvLjwxfeUtsnlspRm5VniG1cfhVjxRrET6Bq6pdKzJayb9pBKkqQM+mfSqN5pC614asIoZvs91aJBcQvGOkqJ3x2bJFeXaPs430u97W+/8AD/g6nS5O+mp2tx5MkglKlS4K8cA855OK4HxHrkOg+JIL90DxXapCRyMbc5Cep5zjvzXTeGNTfWdFg1B5FDTgg46BlJBx+NSX+nwX9i9vqKecyk/veAy/Q9vrUUZ01K9TVap+n4eqX6g03t6o8YTWrKwW50y4vhPZvM4EWzbMk7OXEik8lc4yOarx+KNQj1q4luJUku7W3EJdl+UGTLswUEDIygP69a2NW8H2ltPZXC31uYWYgLPj5nAycMv+z2PU1x1jEJ7FdUVEC39xNNujmAkG58Kpj5wCFB/Gvqo0cJVXMuvfTf8Az6+hxupOHX+v+AdRpPimXR/DNja20H9oRzyXUU+7Cj7zFQSpIIPfPIFcvPcaVc3BvltY7OSK3i8srKWRi0xAfcQSpyCNuKzdNvIf7MlIwfK8yXawBPmPI3y4BB3ccdOBSahqNrHaSTPbOxZbeSJj2Ebh2DDnHTpWtHC06TlKHXXfd9dCJVHJJP0LktwqSf2lpRknYHcxkby41cg7iCoBYDpimaYi3+iT+IIrgWN3aBY2Ea/fdnyjjHOTuC9fQ1NPq1hDbPpzo820yCMKhULu5UgdGOfWqAl0b+yLG0huEjnvntGnCMQ0W0Ak7SMDG0ng9K6U7adfkK63RFqskM7Wl5JcBbwuf3v9wbSGVgSWwD1Oep6Vpvo1/o0NhPFeCOBnA2yNmEIw3/cPLEnnPGKyvEem6DHEkkDGV5ZFVnDsVZdwLM5Bwo6fnWzr11YX1m4MLXE9pGFgWNi67EQqCMYxgdfWneVnzSNJx1tBafoYWmtcx2VtPBd+aXuBKYCmVC5LHA6fNke1bdnqVnF4ileZViluLQgbvljXY24qdo4OM1z9lPpkV5Bc26MsEdr5j4ZsliwDMq57AGtTVVsm+yXkcJSJZ1+aJjlo2jYMSCTk/MOnXms4Of2mv6t/wQl7O2hTmN7qbSaJbzwFrqTI8z5QyuOVGOScrjPoav3VnqtifKstsawKH3BU+9gbiTjeFJzjJNZltNpbXV/fvuhZCkUeRwo25Xb3Ulm5Na+kpEtprF7qMbzKbZE3ZwcueVDDp2xxQr2+L+vQuXLJ+7pcg0y1ubi5awe8khaZ3miXGArqQylj3BOc+tb2oi60251BNRs4vJd/KLwkyHzHGCXwAVGzAGRiuYsb26eeGGAkxSSBZGkbcx6gqSBkDoOlN1SaWO0Otw3rB7mNo8svzOTlU6dFAwCTTlU5ZJbkqk5Rck9Ec3f3cmm6XYxzxg3cIltiWG5cM6srMT32fKPSulspbGW5sbWJ0H2mNFmWJApXbht24H5u46d6yU0mXV7GCaNHhYBROrNkXBTnMeTgsfyzWxoUyWl08+m2iQyxN5bS3nI2uAQFxj5hg5FY88HKzjsa+yfL8Wo7WoYf7St7ueKSG1u7gvN5fAh2jYdhPZgDj1xU1leOjfa948mLzBbpIAAgjfbGW9Sy/wA63WuJo9XaCSRLmxvIlkJuz+6B4IVfQ89O1czqkGkqbXR5I9juzySTODgDgqgftnnnoOK2jOmrScPxJ9lNrlc7/wDBJND8Mrrmp3rpKv2e3kV5CVHzEgk7R6HJ5NV9Tv8ATkvJI2tomRCRHiYEBMnAHP6VqhrGBgdOvDA01mZZmjyigp/qxkYDYzyfevPLgoJ5F/sn7Zhsecu7D/7XBxzXNWquS20uawoKLs3+B//S9P04W+8uFkeLAALkjJPOa+efGV9Pp/jicQSRpJL0cfwnYcZHOTjsK93tLyZZxYxB3ijTO5hnr/tZ6814x4/tNOtvEbXsiStdyRK5jj6sqgjaMdAR19a8eDbly+XyOzD3SfK7d/1sdP4A+zedd+cZDOYoJGdlPzu4JBPp7ZrzS6WG+8Qam8rrbsLqRE5PLZ5GRkZ46enSvQfDBQB55Wkjnuo0fygQ0SqpC7S3PzDkY7YryjURHeaxeKj7E+1McxgZ3ggenp37mlSipcyn+ZrC/M/q6vps7a9/xPpzw9JENLtHhVykw3My5wPqc9M+1bDXbL+58vdJngFsAj1zgj8MVyPhNXi0GGKOTALurBwfmGeT2Az6VuiKMRvJI+0QAsxPZRz/ACqaDgrXV3bz+RlVvd2Vtdu3kXZJLa1V4gc8kqMELkf3mwcH0qQOrbmELLv+UHOPzOP0rMieKWya7s3OZ1D/ADId3PTKtjJ9qljRIkRp93zgE5GcH1xk49q7oune6X4nPy/I0WuPJjbzBtZV6MwOO3sazVUkmS4kjKK4aNFJXr/e5OST+HtVuMRbJCq4VSSzEDn1Oe9RxNEA08KCUE8FcMD7gHpinGcNJdxyp30Yhum2zNPDsCEbAhJaT/gJAPHtmppbqBLOWeV1gSNfMPOCAvJz1Paoy04YZYKzfKq8c885zkZ+lUZdPiuY7yCRVVriNkyQSQzqRyB9a5atSlF6x101/Xr+PUqMJWKXgOC1/wCEeS7jZpXune5b3DsSOTnPHWs8NDcfEZ7hNgaw0wbt+FwZJPlI9zyCf8af4RmR9GhS6gS3ntXNtmIHon3Tx6isBZDZfFmW0t2wb3TU3K2SDsLHke3X8a1VSlKM1117a92un4Ezg018jP1mza00fxLZ+U0kklm8zGRNuWDbgvBPyr2PevSvDri50OwVGDqbWNXC8bPkHynHJI9RXlXivXrjwt4nS21BFnsdSsZ42FumwFpPlViCTuZTknHY8CvRfC+o2q+F9NljuoZ3tIY4JDG2dzgBSNvGce1ceYScoKSTd7O662tfp5W/LsaYaCjfpa5V+HqIfC9rCYmhRJJY0j6jCuTuJ5xnqcmtGDWLeXSZ9RZmmtfPNujYCI+DtJOScJknk9QM1j+AxM/g+8Gmki4t7i7BMmcCQknGO456V5j8NfHMFnLLofiQJHbs0p4JDLKDk7hyDxu4659a890Zy9pJLWL21218te3XubR5eVa7npVv4X0tb+7GnhYJ2iinDkrKq7ieY0PQHoc9e3SsDwXomj3mnWr3VvFIY57mC6UjasrJIQu4dQV6496p+HvFenp441hZ2MUN8ENu54Eix7VX5hj73zEDsPStvwxrOmaNe+JLMxO//E1EikEMSbjARUPQ88nnp1ron7eHO72a5Wnrqtn+fyerFBU3FK2mpjaJYaLZ6DNquozxLHp1zcwyW8ajEziVjtUZHIHT2pniTTH1rTILu1kaztr0rb29pMhyGlbAO4YG0gZ5zzXM61Z32oeGP7U01vKsY9VuZpNqFgAOI2/3QvDe5rq9Q8WWN/oNkLoTwz2F3b3EkypiMquDlhksE544PIruUsQ4+1p62cl6dtLbvv29TmVOknyy8jRt/AiwX8N3NJbl7Yl5F8o8gA4AyT06DH61y13Z6Tr+kJqumQRfaxcQ2k8eOVikbGEGOqqQcnsDVpfG2qal4lt5lMg0mObyzuIEb4wPMJwPlwxIBPYcVGNGt1ElxCr6Qn2st9mLgxsm7iQOMHHHTkAe1YYR148tXFSaelvR30f9aW+RpOFLWFJf13NLxJ8OdKtdEup4TJIdPHyRqAN4DAtuCj5j2HasO/t9Z8KXdyIWju0uAI1kR0BUAYKlQfvqDyPxqnNH4pAk0a1k32cjMFVJt6mPO4qQdrDdwBis53urnV5NQv7OXzZZwDAUXy8IMCQtz84HfvjrXZhqM5rldWM79/W+2j30CVRwV4xshLB9NtJYvttissHkLZcrtwFzukcnu24H6jvXMQaVcxX406C5ee2iddirwGkx8pB/2WIA+XORWzorSy6zqhWae7tYkU5R1OWAY/dYEMB09u5rQ1SItpVs7q6388byRyHaFRRz5bgAYwRlTk/WvZjGFNSkt+q087f8OZKUZWTjocppCXIla31aaYfaVaSVUTcX6gnJ4OAB+FdjcajpcOlp4b0VHfcFLSBlOcc7jyC2cZ9q5bRtVtZI9Ms3gluiP3c5diBt5GF24IHY5ODz610WqXv9mazNdS6m8MMeJHtPLLSfN8wQYXYAQeD/AFp1JS5Erfp+ju/UOeEW1Fa/f/kcs0/9lXUN7G5le3kIdZFy25wFIZQexwQDjIpn29o7q6ubyWGOGVPLVSj4BUN0UZwecemK0/HFpb6Qot9OmeOz1GL7RJbAsVEqkEbm3ZG4Y4PTFSQajZyXk092r29xeLCEXGEyi45wCc4P3c85oXvNX2+X+X6mftGvh0Oet7MzlLO5nuJoLOELbGFG2rjkszcAAZ9c1uzSalfJDpcZgub51aQxkluh5YnruI+g5xVTSrqaxtWs723V2laUfaQ+Qzud5VkHbP8A+qtfwrcJpiXGsSQKLdoRIbksBulOMhE6kfLheM5rCPLFKd9f62saTnJXSRjyy6pPYO92XUkbYo2jEblk6gK2TsXPLdTWpqU80FvB9vvLdLaeHcB5AkXkggLzyB1z+VcbcXs8zW+ozLLJcXUrPIJ2wpOTtAZuwzyMY7V2OrxzXVzp+s2UcassGMTjzAm7H3E5GCc4wB61tpKyWxCqT5rGKkqahItnYzoYymGeOLYAWI+VmJwQxGPb6VgaxJpllqM1vFcyxhSMqqBgCRk4IkxXQXUMOm290UDyXE7N5yKFZYw64Lsozgc4UY/Gubk04ytvggl8vAAaH7jYGNwGOM9x2rKvfaJXO01qf//T6i31fT7y7FhBEZY3Uu02QYlK4+QnP3u47V5v8Vomt9Ssbu1KrIkLF5D8ysmR1HIBBPB98Vc0e51OOE3+l28Jt1nKmFm2sygDPzNjPfHHUCsz4h6jHqFtaebDJao8ohZZT952AP7sLkEZ6E/lmvNlRUazVJ3/AM/T/L7zajKDSdVafmbHgSaS6aczqFlaMjBC5wOQygcDPJOeTkdq4W4heHxZqNxv3BJ5FXCfKQxG5WXpgdjXU+BLq3imEX+qjWSRCsw+fcchQ5BxkDggAVyk91f2/i7VrgtGbYSPGTJjysOQdrAZ+/0B6+tZUeWE5Xd/PzudNfmm71I8t9vLsey+FWRNCS2e4jfypniVkyzH+4Qee34V1RSSJRFIhnXbtfkDg9SeleYaH410rRtFBdhHJPKzx24iwVUfTAwpGMntisXxB461DV7QDToDb28y/MQw3Mo4JbHIHPA7/QcqFGbjH3dP8jOvVjGcvev59z0bwdria1aOxfL27tGrAbt0YJVT+ODzW/8Avbm4CTSMsKuXBUADHYN3/nXnvgHSJ9K0p57gmGW5b9ypBDeWCSM+mSe9egksEOV8x3756n3NaqDjO0X7t36/p+ppSTcE9mWpFiuJ1RpNrJlhGp4ce/qKqyz/AGYNDGVi+UksfmGD2wOfrTLb7WCsUjgsM/MB+Q6np9aS6MiXEbNOU2J8yBAwY59hu49AaKPtbNSWz6vdfL/gX8jeasrkqCEeSIJVYKu8lcBckc0gjjmmVo52JU5bGACSP1xTIpJR91SIgzBSOODz93GR7U+GaUP5ccaMmT9zlwF7kcYNKft209OX8V279RRjG2hzvhtJIbrVrWwbcVvJDISchS6hto3dfw4HSsnUbLVofGOj3pjLWMNrMs0gChhls7Ce57j2q1oKTy65rFzBDMkV7IjqzEAEKNpIwxyDjPOKNU02S68RWdxbwQzJaLl5POZSF7gxDg5HAPvVe0mpWbSutbr/AIC03V35bmMoKUN+pNrvhbTPFsUVs8skM0DH7NMpH7vcefTPQV5Nf+D/ABV4VkaVk8+zmLxvLAu4bCeH2buG756DNey6npkmp2LWmyRIHPP2dxEwQHLAk9Qe9SWF7czSxK+kzabbPmOJ42VwVPG51yCox0IzVxqOnBz9onF+ln/X3GU6fvcqPn/RvEXi/Td72gdRAoYeahTefVuduCO5BB71lBrHWL6RzBJp87DzyYMOrOxzkRnb1yc47Zr6VOhaZOXsdT04XIXIEyb9oGBjeXbcWP8As5A71zV98KvDmrSpNazSWURYbmjfcSQOwPp2NZSxdKhO0o2k3utttL+Wg0py1XQ8qihs7eOSzn1OESKx2ebui2lsb8OM8j0ohOtXFr9isZYrg3U6G+fKyCRFP7sgnGdo645z7102o/C7XhcSRafqEE0TrsYuGV+DlRkcMT68elefX2m+JT+7+wSmTS3a2llgAAV1wQeD6HvXdSxNLEU3+8Ul8tPLQzs4SvKLX9eZcaXxBBYr4ftYJ5dMc7P3e75iWJO7nbnnkYxSRaslxYT6MEkklOLeMzEb4Wzweq/LyBznB9qyLPVruJ/si30tt538LOfunqWyMnr+VaOk3Omm3b7DCsGf3c2ScOvUlydxUHsQK66WHUW3tftfX7yXK691XC41q1E0sV8YZLaORpfsceBEzE5Xey53AdSFxk+1XrHxLqRtbnTdQuvtjTHzI34YRhgVcKefkx27dqyL3TNBuyDZ3QtN2Tsmx5YGcjJAPJ7ZHSo5ILCKVQ+JFljBZo40VYieMncvAHrWlWnzpqUvLoTGrZpxj+Z3vhi78M2vhsaLrF7D9oLS+ei7y4DnIAbb1x/hUN7rHhRnt47aZZhZkGOSUP8AusfwfIvJ4HDVyF1caILozyzC4Dw+V5iQhG3KPv5zzg8lqLTxBZafp7ac8RmsVRjslRSJXb7p+UZXHUnJrjrwrRhzQ1fVK33q6eq6L7zSlKEppSS+f66o111KzRpI9P1ORXkyCkKkkljyVXbgEjv2z3rZ1nxLo1ppL6daiTzoIRGHkUlFZ8Z3MRlsjnP4Vy1/fi3sLSazYJPYIsaywjMhRhkc5xjk5rL/AOEhudVsZrWe2hckNKIyzFmJGMnOcgEA7ciscNFyfMo6u99r6PySv+h14iPs3abtppbbb1Y+J49Plt7m6uFe2AZlgDEI5YZJXPGFZuw9qlvtaS5ikvPtLqDLsWMFgVjZMLt4w248kdgPeqz3EtvosKwEFCAsjZVljyOQE2YXHfHNIZbmLTLeEzwBt4cl2VWJB4YHGQo+nHavRWHnGNnFd/60OGU4uV+d9tv+CZMZuHRtPeKW33goHLbBJk9X3ED246VZhs5muhvnEs0cpdIYgWUNwMtIfUAcDPSrWoQ3uszEwWsmoJboMSRbiqnI4B53Z6dM1r2+j2/nwnxDO/mTA7EEiJHkjKowGX3AnB4x71DlRhd1JK/kRJ3+G/zOb+ztFAlvclxcFmVpwfur/EQMDJwcdc5qxqV4t1JDCs7LBEgRY40ZSqpgLkk4Jx+ta2nFtY0+10iQrHczv5irE2OCSOAxVRwoHXPFdXZ6f4at/lvbe732uRIFwyj1BaIYycZ6/U1z1q9KEIylulskv18/xKg25Oz+88pubuR5J44xJcGTCx+awkZSwxhVHAJ6d8V6tBoOsXOiIl4slp5cX7912lxGEO35AoJwMcbs12+i6f4Ou0W+0a0isnt28tZfMCu0uM7WKljg9MkV0+qiLTYBdm3kvAPkeOOTG0NgthTwQvGOCa+dr5qlONOlFx9d3+Pn1tqdapScXK9zyAaTY6dpcFks0twblgyMQvULuUNuYHkE/L1rmZPE+qWDfZoJbFlUDosmAT1HCkcV7hc6Npv2WRraQLK7meWXGWxgnr2/AZrze+0bxUtwRoU7vZ4Gw4Qn8S3JP1rgWNi21Uf36fo9TL6u0tF92p//1POry+1GG2Y3OqXG5zujgjhG/cSc5IODg5yQKxrbUNU1G4W9vZ2uLYEBFkUqGbcVGOwYAnJHvmuh0i2exQS21tK13b8CVmYiJSvLKVGAO/8A+uresXVzqOitHHdW9w9rNGjCMOGbcdgZtwxg+nUmnipVltD3Vu9PwS8+9isLJSkuV+90/wCDcWfSTHbH7HH5jMjFFKhwhBUEtt5JIHTPWuGe2vBqs1rcxApGU3o4MYcgAAOq9MV3GjssdjdWFvKyKSFO5sleCWI2cgk89Tjis26a51zVJ7izvkigjnEjSHA37AFJUkZIwejGuChCdWUoxWn43+466td0JqXPzS69n/w2h0lp4VTXfJkhnSC2tUXerx5JO45VSTxgAc859K9H07w/4f0iPNlGss7gYeUk4X/Z7D8BXm2gzarozXDRM80d/scSTr5m3YMnJGCgOew6ZroIfGEv2kRXX2ZI4iGiZy8YYN95cHJBHqRz6VhWo4qEXTTTil1u7666L+vQzjWoSnzONm/Q9BvZkLfZ7ePe20HcWAwepGeuaqrcLHbDbHscHAUtuUH1OMZpn9pWt83lwktIVWRAAwU+4IGOPrWjGI41DSBCw68EEHrzmuanXmnCNtNdk/l1duv+R3q1tCDzreIvH5wDIBlUGDkjqM9c0kl0imMJ94DJUEZ59O1NMKOfMjQA7t3UBewI9f1oZFRnVQH3DduUjI9AOxFddXEQSatfps7fPR/kyVrLfsNW9SFfNRhsLBTu7cevAPpxTNVuLYadJJcQLcx7dzJHncdo9Bgk57ClninEAkUnZ1wRntzx7VmawZZLRZXSR5E+eFV27gQSAcNgcdee1XGpThBWXn10+f5beREuaScun9f1+ZzHhC+kvUlW186ySI5NrKjYGeMB3z9cDgelacVp/Z2vNqOnxxST3EKxyW6KqsUGeVduPc+uKn0c6innz372zvKNtuUJKnH3t+CBn6DNULGUWep6jNf+RF54QRyIdqjYMDLE88HpmuepUhV56tH33p3s1tbbdN+voYxgoqMZ6a/1+XodY13bxKxunS3V1IIlbaoz1yM+nXHWsfQVhFn/AGvNKI7WWN1jiPyQq6kguq5JA4zyai1m2W905GnuHlGSGa0RGO3jnMm457cdq5nTba5mmOh2Nq91asfPgvJZ4wyIyqH27VZQTjGDz3rnp0aUKc6MFyy69fXe93byLr1Je0TtddDRk8XWlvexyahOt2symINauDuHcMh+bB7c1bbxpaukUWhwTLcK/lJBiMlm7gklgvGfyrOl8HSXsMNpPaPYW0O5S9uqyytjHzyy7h16DCmuvtfDGlm0itjAdseD5gZsllGAzAHlu44xWNevhYwhG1+qSV0tbX0/HUzp060pN3t3fU8v1rUbybUpftty9ijgRzAyDCFlBZfk4yB9COtY0Ol6lqltfahAm+0lTMLW8mTn7jxsQerLzk5IB6GvUtJ8MaFE13JdWiXVyXdllfDk4PHBVQp4H+NWo9KtDJd3KuLaxa2Cz28ZIKy9dxwSFwnTbzW/1n2adOjT6a2slf0313QKhK15Pfv+Z4o1lDbWsWlaxCIliKsWiQ7lSXOfMbC7woxnvnsKtXvh6z0fbaWIguYtQV0jdSruxOFVCWxkDIPtnvXoWiyR6z9s00aglzYBybVIWHnmFQoZXDrkrzjd1Peux1KwgsdOt00yK20y2sVeXM0QlAHBLAAr82c565q3iqkVeS1vayvr26ad+pl7BO6T/r+vM+b4fD11Fo8lreafG19CocFcRS8scliy4Ix19umK6BPDd5c2Msb2SWDyAs8rOgV8rnO8KeeoHvxXpF1oun65ai90aeKS7lCi6muo5Hhfjjy42IVTnkZzjpWzZ6U+i+GbPRSY79/tAaRmiV18pm3FQjN8oHGCDx6VlisbOk1KXurzul/wPR6sdPDtq6u/6/r0PF5/At5DLNBdIy2toowURskhQdxJyq5/i3ZHtWTa+GbGSz86SVhGoZUWPY8i7mJUlcfPxnoBj0r13VBqWuxXVxo8U0aSMYxJNLhMp8rq0IBOMg/KcZ6966LR7PRdFjh3x+TLcDAbySSScA5GGK9emayjmvLCLmm5SdklZ7LXW/z118jVYa7bvourPGJ/C2g2V1HbWs8moSxMS1ou1FCspLEvuGcYHf6Vmv4X0ie1Gp3YNlIGSBLfJwzkkfO2BhQByP1r6Dvbaz09JZrHT/tDJjcbVUDMnqMkZwe2aw9Q06xv7YXzRTzzRurra3DrGidiMLnHHJBzWVLMq0vecGl3um35WTt23t6jnheilr8/1PG/+EGa0uFN7HEN4kCxGQMfl5+QPtU7udu4jHWkvvBs+YVtFLyo2YpX8re6gBmyygoNh455OTzXqGpaMNS1qy0eeRtNnUC5UxRrMjLG2Cnm8fNjqoGMHPNdtHbM0UU6q1vACQYJFUFsZAJ67emeD0rs+vzSgp7vdK7sujdm9/x7mawrd7P+vw/roeW6eNZhY2kmoPBcsjC3WDYCT0VnU8fN2AK471qarq2qaM0FpqMFpdXD43vcKodV4Xc4RiAWYkjOOOvNbsVpbXV+v9padLIryEZIVvJK8qSWI4z0wDS+JTe2GkXTXV5aE3fyNPdqEEakcKNoO89epz6VjKClWhCVFWfy+a66edtbWexSp1FByU3/AF6/13OX8Kaf/wASqTw3qdkQ8JlIuIkWSM73Z1BdT8uAenPFWpvDuq3qx2+qraJEhAhlg8yNgONw8vlD0/iyKpeH7+Wazk+1QQq8CyhArSF3jX5dyhVJC9McZ56V3OjwzpaR3BZJbcgEAyNIwyASMEAjHTB6Vx4vnoVpSVK93fdad3u9+1kbUEqqSm9bdPy2/E4i6sNZ3tZWsEC2NsvyXE8aszOSMtGseCMdjt4qXQrDxG02/U7d18xGVJxI4cop+8qNnBPHJAPtV3xPY3V6wijtUlt42Dhkdo5+eoVipUD6c4rP8O3V7b6kdPDXkziNlCPGTBGR83+uyN2Rxk9TWzjKVGU1TSejavt8+um99PuCUEqiWtv6/rud2YFSBYTIW8tPnlf7xPqR0JrnZ7KSCTazzTk87i6x9fYCuqVd2yW+RIhuHzjgZPGPT9ay7/TQLlgPmXqCpJ4P9a8ZUPec3FPo3b3W0+mq17v7kdrvZJfnqf/V0Ps+gzyvawQRLKEC/KCB5Z5wSAQaxfFupaBZ6LeWOoXEa3UsBkWJAcbgTtK8A53Dqa6lLy1ne3jHmpMcsGTC8YyR1PX6VwXjSK0nms1kDLdje0TBUdFUkA5DAkn06CvMpTU68YVHq0/n/Xn8jvqRUKbktzgdCuXt9Reawna5aONiHXL7Q47rg5568jNa3ieNpL2IxGBprkKzGJSrE7cBdo3DPTBIA7VHo1xqXiNZLGO6bJhxKrBYkwvoYhuPJ6H862PEVxfeHILa8tpQQwWORdqnfsHGTtz0BAPWt5VqkKsI0YpXvpd66aXdrrrt+unM6b9m+fZWttp/n0K9jp9tJPaXEt4kZhYNGIZv3qnaAVcn5FB7gA+gr0FtDv1gkS3aD5maRZDGHkOc43HgHGccAV5uNJnubawvrS3trSy1ZvLaBWdgZCflaRWXBUH+EEZr1/So5dL0uCxuWjMkaBWEMeI8E4AUE5AAP50pQnW9yrFb6ppP5afOzTa7+Towipc0f6/r5HA+HVNnrv2LVLaa4yA1tPGrICDjd94rhBxnFet2y3Pk3LGNjuyXjJ3N7YwTj86ijgh1CUrCDGbck/N82RgHH8qovqyWsQuYiyCMtvVVXDkYx78Z9auM/bRjVgvd18vwsl/wTeEFBuLepZt/L8oobV13HqzZZegyCen0qwIb2GMySqsoHYcHgetULe/iu8odyvHySoABJ9smpZb6eOD7PJ0GTuTOTj65611TwrqRcFpf+ut1+B0JKN5djQDw48y3DMr/ACs4PCn6H+lUDJKkT3t43nRRqxIxnKgZIIPsKs2l5DOpjQNHHg5AA5zx+H4VhNqFvZolmsR/fHaOcjvye9YzoOndN6adtF/l97Gpxcb9zn9Hu9IU3mr6DA7RXMpdbd2Xa1wVxsjJ5Q/xHd1xj0qnqWnXL65Z6xfabbwRxxN88twBkdSZE2Hc4JIHJHA5roLEadpF5Li1SMM4Ki3XywAADzyQTz6Vc1W3sJVfxIm8S6bBK+XVZCQw6Dd0weeCKdOjSnaaS5WtdN7/AOZyyT5Wk9UZHiDzhb2stndGxidw3+rdmDFSQGCkbQ3TBB5rY8PNpGiLkWsMdzKQHkjhManGBhn/ANpjwM96r3F5NcWUt3pzCO5htRMWkUYbCbzwOhx06jPY1T8LeI7PXTBqEFiRNMNhaSU/w4/hAxWKy9LWhpFLy6v7+9tbLsaRfNO71f8Akvu/D5nSSRXlk02uXGwtESIUhLBmVmxsbPGSTgelXXNsYgqQ/Z3Y7mCsQRu6n0zVPXUaSSITMyCNhxExXk57jBI4qUiR5wsAXzmAZmkOQTgY4xjPvW8MM/YqEmuZJK9uy6r738zVStJuO25ovJashUtkxqVbMe9yAM9CRyea87j1kWuqvex3EmmaMZgjQT2+zz5CnUMeRwuOAQMfl1j6jFHqMELQAzXPEkmeTg7ePTn0rKmlZvEMW5TNExZdryECLaM7owBySB3Peud4JN1EpNKdr7elrNPfuKbb5X2/ryJvDyyNNdvM6XCrKfKuY1AzE2GAOMDKk4I/Otu4j06ZplhdnnijJOCWY+nydM/hWRbtdWf2i8nlE0MpLrCEVQg4AAI5PA5z+lbDXgkhV0t4kLKNpAOc4GMnPb2xWscEoU+SKdn52t9yvq+wotuXK90ct4Y1lRo89vdahHdXQYys6YZlHAAESjnb3GPyrYsrqFpXza3BYjcZGgMaOpOflz7+oFczpMq22rvpN3H9qvljy127AlQ3zFUUKMDt1rtrGOa9jJjbymON3ORgccAjrXm4/Lr06koRV5a3e3o9G381b5jozXNFN7f195yYv9WvdVludInhudPd2Vo3VYmRgcM2QrM5yDwcZrqHubHUInWFTcxruDoFMZPHOS3rjoa87Nouv+Jbi20u1g04WkksUl2uRcGUA4ddoC9fU5reinTTY4rfUmkv9RjZ2N1nygVPOCiYU4A4yDV4XCJ4deyS5n1tZ+bdmr3t0a32MlO8+WTuv677fiXmi01tNSxubMLAjABQGAAHTlR/WrEqQaTGRptuVhx5jLGgLMQOiqCMscd6Q35s7NthYw3EgYo53+ueuMdKkhvbmKZbeOGIxXO7c+Srpj+6uGB/MVUsIo+/UW71V2027dHe1u36m11T9fxINN1i01edori2uNPvETf5Ew2q6HjcH6E56gdK2JZgrLYxodsi5Xa245HJyAOBnvXLpZW1vqksvnTvJckOWdt4UgHhVY4Uewq9epB9k3EF9vAdvvfL8x6cDNc2Jy2cqsOd3pbcq0s+j6ad73fZG0Ks403da73NOYEsYzmMDBPzHLDp0xz9c1haxPHZadINRuJIoQ6FZIF3uuThRgqwweB0rRTVlZoJUBEcq5VSoJyeMk59+gFZGpNYXkF3YXUTSoAUkOcE7gTwecYyCD2Irf8As+U4RpT0S10d3fXuttf+AQ63uylFkNnc376XPLfQq8EjssErForjyx03eXxnI7Y461Z8+6s7f7LHAqlFLxspDFkGOTwOT71WsNZhn0XSobi0ysjGCMeYW27Dt3EsCSSBzzW8kCuTcrgGJmUr2wvHFZVsNh4L3opLSzsnrstP6RjRbbUlIzpNXhhuIIw43Om5t5HB4BH6/SuZ1eO6T/iZQXS3ghYPtd/NCEHGURdp3ckYLEfzrupYFSFZ3hikfORkdzx745rGfLQw2vlRqWcrIoyVycsCD169c9arD4enSpyioX723163v/w2xvVi6nUfBfpGI4zIt3a4y4iI2q3cd9pz/Dnis7WtOuL2986KIhNoC/vmj45PQOPXrVCC2sf7Ra92ZkRi5bABLAEHkckHP3ScV5T478S36a80UE7osUYU/KpyQW5q6tGCitXf1f5LS5FOpZuyP//Z";
+  const need = new Set(["reach", "formula", "prefetch"]);
+  return {
+    set(v, step) { if (!done) real = Math.max(real, Math.min(0.97, v)); if (step && !gone) $("lds").textContent = step; },
+    // the screen stays up until the app is actually ready: first days searched, formula found, other paintings fetched
+    mark(name) { need.delete(name); if (!need.size) this.finish(); },
+    finish() { done = true; real = 1; if (!gone) $("lds").textContent = "Ready"; if (!raf && !gone) raf = requestAnimationFrame(frame); },
+  };
+})();
+
+// The painting is a point set: an N × M block of lattice points centred on the origin, each with the colour of its
+// cell of the scan (averaged when the grid is coarser than the scan, smoothly interpolated when finer).
+// Point (x, y) is grid cell (cx + x, cy − y). nA lives in the same coordinates; every point of nA that lands on the
+// painting replaces that point with red.
+let paintIdx = 0, pic = null, buildToken = 0, view = null;
+async function buildArt() {
+  const token = ++buildToken, P = PAINTINGS[paintIdx];
+  $("paint").value = paintIdx;
+  $("credit").innerHTML = `${P.artist}, <i>${P.title}</i>, ${P.year}.`;
+  let img;
+  try { img = await loadImg(P.file, (f) => Loader.set(0.05 + 0.5 * f, "Downloading the painting")); } catch { $("credit").textContent = "The painting failed to load. Click the picture to try the next one."; Loader.finish(); return; }
+  Loader.set(0.57, "Sampling it into points");
+  if (token !== buildToken) return;
+  const N = Math.max(20, Math.min(5000, Math.round(Number($("dots").value) || 300)));
+  const iw = img.naturalWidth, ih = img.naturalHeight, edge = 0.012;
+  let sx = iw * edge, sy = ih * edge, sw = iw * (1 - 2 * edge), sh = ih * (1 - 2 * edge);
+  const M = Math.max(10, Math.round(N * sh / sw));
+  let src = img;
+  while (sw / 2 >= N && sh / 2 >= M) {
+    const t = document.createElement("canvas"); t.width = Math.ceil(sw / 2); t.height = Math.ceil(sh / 2);
+    const tg = t.getContext("2d"); tg.imageSmoothingQuality = "high"; tg.drawImage(src, sx, sy, sw, sh, 0, 0, t.width, t.height);
+    src = t; sx = 0; sy = 0; sw = t.width; sh = t.height;
+  }
+  const cv = document.createElement("canvas"); cv.width = N; cv.height = M;
+  const cg = cv.getContext("2d", { willReadFrequently: true }); cg.imageSmoothingQuality = "high"; cg.drawImage(src, sx, sy, sw, sh, 0, 0, N, M);
+  const comp = cg.getImageData(0, 0, N, M);
+  pic = { N, M, cx: Math.floor(N / 2), cy: Math.floor(M / 2), cv, cg, comp, base: new Uint8ClampedArray(comp.data) };
+  Loader.set(0.62, "Finding which points each day reaches");
+  // while the loading screen is up, fetch the other paintings too, so switching later is instant
+  if (!buildArt.prefetched) {
+    buildArt.prefetched = true;
+    const others = PAINTINGS.filter((_, k) => k !== paintIdx), prog = others.map(() => 0);
+    Promise.allSettled(others.map((O, k) => loadImg(O.file, (f) => { prog[k] = f; Loader.set(0.62 + 0.28 * prog.reduce((a, b) => a + b, 0) / prog.length, "Fetching the other paintings"); })))
+      .then(() => Loader.mark("prefetch"));
+  }
+  layout(); startReach();
+}
+function layout() {
+  if (!pic) return;
+  const c = $("art"), dpr = Math.min(2, window.devicePixelRatio || 1), W = c.clientWidth, H = c.clientHeight;
+  if (!W || !H) return;
+  c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const pp = Math.min(W / pic.N, H / pic.M), ox = (W - pic.N * pp) / 2, oy = (H - pic.M * pp) / 2;
+  const keep = view && view.N === pic.N && view.M === pic.M && view.pp > view.fit.pp * 1.0001
+    ? { z: view.pp / view.fit.pp, gx: (view.W / 2 - view.ox) / view.pp, gy: (view.H / 2 - view.oy) / view.pp } : null;
+  let mask = null;
+  if (false) {   // points are drawn as solid squares so the painting stays fully coloured
+    mask = document.createElement("canvas"); mask.width = c.width; mask.height = c.height;
+    const mg = mask.getContext("2d"); mg.setTransform(dpr, 0, 0, dpr, 0, 0); mg.fillStyle = "#f4f3ee"; mg.fillRect(0, 0, W, H);
+    mg.globalCompositeOperation = "destination-out";
+    for (let j = 0; j < pic.M; j++) for (let i = 0; i < pic.N; i++) { mg.beginPath(); mg.arc(ox + (i + 0.5) * pp, oy + (j + 0.5) * pp, pp * 0.47, 0, 6.3); mg.fill(); }
+  }
+  view = { W, H, dpr, pp, ox, oy, mask, N: pic.N, M: pic.M, fit: { pp, ox, oy } };
+  if (keep) { view.pp = pp * keep.z; view.ox = W / 2 - keep.gx * view.pp; view.oy = H / 2 - keep.gy * view.pp; }
+  draw();
+}
+
+// Reach: first day each painting point joins nA, from a breadth-first search in a worker.
+let reach = null, shown = -1, cur = 0, playing = false, tick = null, gworker = null, geoNow = null;
+const gurl = URL.createObjectURL(new Blob([$("gsrc").textContent], { type: "text/javascript" }));
+// A new set of points keeps the current day and play state: the old picture stays up while the search runs,
+// then the new reach is applied at the same day. A new painting or grid (different points) starts clean.
+let started = false;
+function startReach() {
+  if (!pic || !geoNow) return;
+  if (gworker) gworker.terminate();
+  if (reach && reach.pic !== pic) { reach = null; shown = -1; pic.comp.data.set(pic.base); pic.cg.putImageData(pic.comp, 0, 0); draw(); }
+  $("unit").textContent = "searching…";
+  const forPic = pic;
+  let next = null;   // the reach being streamed in; replaces the old one on its first chunk
+  gworker = new Worker(gurl);
+  gworker.onmessage = (e) => {
+    if (e.data.error) { $("unit").textContent = e.data.error; Loader.mark("reach"); return; }
+    if (forPic !== pic) return;
+    Loader.mark("reach");
+    const { cells, counts, done } = e.data;
+    if (!next) {
+      next = { pic, order: new Int32Array(Math.max(1024, cells.length * 2)), n: 0, offsets: [0], maxDay: -1, done: false };
+      reach = next; shown = -1; pic.comp.data.set(pic.base);
+    }
+    if (next.n + cells.length > next.order.length) { const t = new Int32Array(Math.max(next.order.length * 2, next.n + cells.length)); t.set(next.order.subarray(0, next.n)); next.order = t; }
+    next.order.set(cells, next.n); next.n += cells.length;
+    for (const c of counts) next.offsets.push(next.offsets[next.offsets.length - 1] + c);
+    if (done) while (next.offsets.length > 2 && next.offsets[next.offsets.length - 1] === next.offsets[next.offsets.length - 2]) next.offsets.pop();   // no painting points on the last days
+    const grew = next.maxDay < 0 || done;
+    next.maxDay = next.offsets.length - 2; next.done = done;
+    if (grew && tableFor) facts(...tableFor);
+    $("day").max = Math.max(1, next.maxDay);
+    if (!started) { started = true; playing = false; $("play").textContent = "Play"; }   // opens paused; Play or Space starts it
+    setDay(Math.min(cur, next.maxDay));
+    if (playing) loop();
+  };
+  gworker.postMessage({ groups: geoNow.general ? geoNow.groups : [{ starts: [[0, 0]], moves: geoNow.pts.filter((p) => p[0] || p[1]) }], N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q });
+}
+const REDS = [[224, 53, 43], [240, 74, 53], [201, 42, 34], [255, 95, 69]];
+function applyDay(d) {
+  if (!reach || !pic) return;
+  const { order, offsets } = reach, px = pic.comp.data, base = pic.base, last = offsets.length - 2;
+  const hi = Math.min(d, last), was = Math.min(shown, last);
+  if (hi > was) for (let k = offsets[was + 1]; k < offsets[hi + 1]; k++) { const t = order[k], r = REDS[t & 3]; px[4 * t] = r[0]; px[4 * t + 1] = r[1]; px[4 * t + 2] = r[2]; }
+  else for (let k = offsets[hi + 1]; k < offsets[was + 1]; k++) { const t = order[k]; px[4 * t] = base[4 * t]; px[4 * t + 1] = base[4 * t + 1]; px[4 * t + 2] = base[4 * t + 2]; }
+  shown = d; pic.cg.putImageData(pic.comp, 0, 0);
+}
+// Edge mask for the painting: solid inside, thinning to sparse dots over the outer band.
+function feather(N, M) {
+  const w = 700, h = Math.max(1, Math.round((700 * M) / N)), c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"), b = 0.085 * Math.min(w, h);
+  let seed = 11; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = "#000"; g.fillRect(b, b, w - 2 * b, h - 2 * b);
+  // dots get denser and larger towards the inside, so the band blends into the solid middle with no visible edge
+  const n = Math.round((2 * (w + h) * b) / 1.6);
+  for (let k = 0; k < n; k++) {
+    const x = R() * w, y = R() * h, d = Math.min(x, y, w - x, h - y) / b;
+    if (d >= 1.02 || R() > d ** 1.4) continue;
+    g.beginPath(); g.arc(x, y, 0.8 + d * 1.6 + R() * 0.9, 0, 6.2832); g.fill();
+  }
+  return c;
+}
+function draw() {
+  if (!pic || !view) return;
+  const g = $("art").getContext("2d"), { W, H, dpr, pp, ox, oy, mask } = view;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.imageSmoothingEnabled = pp < 1; g.imageSmoothingQuality = "high";
+  g.drawImage(pic.cv, ox, oy, pic.N * pp, pic.M * pp);
+  // the painting's edge dissolves into scattered dots, fixed to the painting so it zooms and pans with it
+  if (!pic.feather) pic.feather = feather(pic.N, pic.M);
+  g.globalCompositeOperation = "destination-in"; g.imageSmoothingEnabled = true;
+  g.drawImage(pic.feather, ox, oy, pic.N * pp, pic.M * pp);
+  g.globalCompositeOperation = "source-over";
+  if (mask) { g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(mask, 0, 0); g.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  // faint axes through (0,0) in lattice coordinates; tick spacing follows the zoom
+  const X = (x) => ox + (pic.cx + x + 0.5) * pp, Y = (y) => oy + (pic.cy - y + 0.5) * pp, step = niceUp(W / pp / 6);
+  const x0 = Math.max(ox, 0), x1 = Math.min(ox + pic.N * pp, W), y0 = Math.max(oy, 0), y1 = Math.min(oy + pic.M * pp, H);
+  g.strokeStyle = "rgba(255, 255, 255, .35)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(x0, Y(0)); g.lineTo(x1, Y(0)); g.moveTo(X(0), y0); g.lineTo(X(0), y1); g.stroke();
+  g.font = "11px Georgia, serif"; g.textBaseline = "middle"; g.fillStyle = "rgba(255, 255, 255, .75)";
+  g.shadowColor = "rgba(0, 0, 0, .45)"; g.shadowBlur = 2;
+  g.textAlign = "center";
+  for (let v = Math.ceil(((x0 - ox) / pp - pic.cx) / step), t; (t = v * step) <= (x1 - ox) / pp - pic.cx; v++) if (t) { g.fillRect(X(t) - 0.5, Y(0) - 3, 1, 6); g.fillText(String(t), X(t), Y(0) + 11); }
+  g.textAlign = "left";
+  for (let v = Math.ceil((pic.cy - (y1 - oy) / pp) / step), t; (t = v * step) <= pic.cy - (y0 - oy) / pp; v++) if (t) { g.fillRect(X(0) - 3, Y(t) - 0.5, 6, 1); g.fillText(String(t), X(0) + 6, Y(t)); }
+  g.shadowBlur = 0;
+}
+const niceUp = (v) => { v = Math.max(v, 1); const e = 10 ** Math.floor(Math.log10(v)); for (const m of [1, 2, 2.5, 5, 10]) if (m * e >= v) return m * e; return 10 * e; };
+let exactF = null, exactAn = null, pending = false;
+function setDay(d) {
+  cur = d; $("day").value = d; $("dayv").textContent = d;
+  $("fv").textContent = exactF && d < exactF.length ? exactF[d].toLocaleString() : exactAn ? exactAn.p(d).toLocaleString() : "…";
+  if (reach) { const k = reach.offsets[Math.min(d, reach.offsets.length - 2) + 1]; const tot = pic.N * pic.M, pct = (100 * k) / tot; $("unit").textContent = `${k.toLocaleString()} / ${tot.toLocaleString()} reached (${pct >= 99.95 && k < tot ? ">99.9" : pct.toFixed(1)}%)`; }
+  markDay(d);
+  if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; applyDay(cur); draw(); }); }
+}
+function loop() {
+  clearTimeout(tick);
+  if (!playing || !reach) return;
+  const max = reach.maxDay, step = Math.max(1, Math.round(max / 150));
+  if (cur >= max && !reach.done) { tick = setTimeout(loop, 120); return; }
+  if (cur >= max) { if ($("loop").checked) setDay(0); else { playing = false; $("play").textContent = "Play"; return; } }
+  else setDay(Math.min(max, cur + step));
+  tick = setTimeout(loop, 120);
+}
+
+// ---- numbers
+let worker = null, timer = null, t0 = 0;
+const wurl = URL.createObjectURL(new Blob([$("wsrc").textContent], { type: "text/javascript" }));
+function run() {
+  if (worker) { worker.terminate(); worker = null; }
+  $("err").hidden = true;
+  let geo;
+  try {
+    const { groups, dim, general } = parseInput($("inp").value);
+    let q = 1;
+    for (const g of groups) for (const p of [...g.starts, ...g.moves]) p.forEach((v, k) => { const d = toFrac(v, k ? "y" : "x")[1]; q = q / gcd(q, d) * d; });
+    if (q > 24) throw new Error(`These fractions need a common denominator of ${q}; keep it at 24 or less.`);
+    const scale = (P) => [...new Map(P.map((p) => p.map((v) => Math.round(v * q))).map((p) => [p + "", p])).values()];
+    if (!general) {
+      const o = scale(groups[0].moves).filter((p) => p[0] !== 0 || p[1] !== 0);
+      geo = geometry([[0, 0], ...o], dim); geo.q = q;
+    } else {
+      const G = groups.map((g) => ({ starts: scale(g.starts), moves: scale(g.moves).filter((p) => p[0] || p[1]) }));
+      const r = Math.max(0, ...G.map((g) => geometry([[0, 0], ...g.moves], dim).r));
+      geo = { general: true, groups: G, r, q, k: G.reduce((a, g) => a + g.starts.length + g.moves.length, 0) };
+    }
+    if (q > 1) { const fq = (n) => { const g = gcd(n, q); return g === q ? String(n / q) : `${n / g}/${q / g}`; }; geo.fmt = (p) => (dim === 1 ? fq(p[0]) : `(${fq(p[0])},${fq(p[1])})`); }
+  }
+  catch (e) { $("err").textContent = e.message; $("err").hidden = false; Loader.mark("formula"); Loader.mark("reach"); return; }
+  geoNow = geo; exactF = null; exactAn = null; startReach();
+  $("poly").textContent = "computing…"; $("stab").textContent = ""; $("meth").textContent = "";
+  facts(geo, null);
+  if (geo.r === 0 && !geo.general) { show(geo, [1, 1, 1, 1, 1], "exact"); return; }
+  t0 = performance.now();
+  worker = new Worker(wurl);
+  worker.onmessage = (e) => { if (e.data.done) show(geo, e.data.f, e.data.reason, e.data.provisional); };
+  if (geo.general) worker.postMessage({ groups: geo.groups, q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY });
+  else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY });
+}
+// With fractions, f(n) counts the sums that land on whole-number points. It is a polynomial on each residue
+// class of n mod q (a quasi-polynomial): fit each class through f(n), f(n+q), f(n+2q) past the stable day.
+function analyseQ(geo, f) {
+  const r = geo.r, q = geo.q, N = f.length - 1;
+  const C = (k, j) => { let v = 1; for (let i = 0; i < j; i++) v = v * (k - i) / (i + 1); return v; };
+  const dq = (n) => { let s = 0; for (let j = 0; j <= r + 1; j++) s += (j % 2 ? -1 : 1) * C(r + 1, j) * f[n - j * q]; return s; };
+  let s = (r + 1) * q; for (let n = s; n <= N; n++) if (dq(n) !== 0) s = n + 1;
+  const n0 = Math.max(0, s - (r + 1) * q), den = r === 2 ? 2 * q * q : r === 1 ? q : 1, parts = [];
+  for (let j = 0; j < q; j++) {
+    const n1 = n0 + (((j - n0) % q) + q) % q, f1 = f[n1], f2 = f[n1 + q], f3 = f[n1 + 2 * q];
+    let A = 0, B = 0, K;
+    if (r === 2) { A = f3 - 2 * f2 + f1; B = 2 * q * (f2 - f1) - A * (2 * n1 + q); K = den * f1 - A * n1 * n1 - B * n1; }
+    else if (r === 1) { B = f2 - f1; K = q * f1 - B * n1; } else K = f1;
+    parts.push([A, B, K]);
+  }
+  const frac = (a) => { const g = gcd(a, den) || 1, n = a / g, d = den / g; return d === 1 ? String(n) : `${n}/${d}`; };
+  const term = (v, x) => (v === 0 ? "" : `${v < 0 ? " − " : " + "}${Math.abs(v) === den && x ? "" : frac(Math.abs(v))}${x}`);
+  const text = parts.map(([A, B, K]) => ((r === 2 ? term(A, "n²") : "") + term(B, "n") + term(K, "")).replace(/^ \+ /, "").replace(/^ − /, "−") || "0");
+  return { r, N, n0, q, text, a2: (2 * parts[0][0]) / den, p: (n) => { const [A, B, K] = parts[n % q]; return (A * n * n + B * n + K) / den; } };
+}
+// Formula text to typeset HTML: italic f and n, stacked fractions, raised squares.
+const mathHTML = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/f\(n\)|(\d+)\/(\d+)|n²|(?<![A-Za-z])n(?![A-Za-z])/g, (m, a, b) =>
+  m === "f(n)" ? "<i>f</i>(<i>n</i>)" : a ? `<span class="fr"><span>${a}</span><span>${b}</span></span>` : m === "n²" ? "<i>n</i><sup>2</sup>" : "<i>n</i>");
+function show(geo, f, reason, provisional) {
+  Loader.mark("formula");
+  const ok = reason === "exact" || reason === "stable", an = geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
+  exactF = f; exactAn = ok ? an : null; setDay(cur);
+  const allSame = an.text && an.text.every((t) => t === an.text[0]);
+  $("poly").innerHTML = mathHTML(!ok ? "f(n) = not settled" : !an.text ? `f(n) = ${poly(an)}` : allSame ? `f(n) = ${an.text[0]}`
+    : an.q <= 6 ? an.text.map((t, j) => `f(n) = ${t} when n ≡ ${j} (mod ${an.q})`).join("; ") : `f(n) repeats with period ${an.q}; when n ≡ 0: ${an.text[0]}`);
+  $("stab").textContent = ok ? `Stable from day ${an.n0}` : `Not settled by day ${an.N}`;
+  const ms = performance.now() - t0;
+  $("meth").textContent = `${reason === "exact" ? "Exact" : provisional ? "Counted, proving…" : ok ? `Counted to day ${an.N}` : "Memory limit reached"} · ${ms < 1000 ? ms.toFixed(0) + " ms" : (ms / 1000).toFixed(1) + " s"}`;
+  facts(geo, ok ? an : null);
+}
+// Counts table: one column per day, rows f(n), Δf, Δ²f; the stable day and the current day are marked.
+let tableFor = null;
+function facts(geo, an) {
+  tableFor = an && exactF ? [geo, an] : null;
+  const f0 = an && exactF;
+  if (!f0) { $("facts").innerHTML = `<span class="muted">counting…</span>`; return; }
+  // as many days as the simulation shows; past the computed counts the stable formula is exact
+  const q = geo.q || 1, N = Math.max(Math.min(f0.length - 1, Math.max(30, an.n0 + 12)), reach ? reach.maxDay : 0);
+  const fv = []; for (let n = 0; n <= N; n++) fv.push(n < f0.length ? f0[n] : an.p(n));
+  const f = fv;
+  const row = (label, val) => `<tr><th>${label}</th>${Array.from({ length: N + 1 }, (_, n) => `<td data-d="${n}"${n === an.n0 ? ' class="st"' : ""}>${val(n)}</td>`).join("")}</tr>`;
+  const d1 = (n) => (n >= q ? (f[n] - f[n - q]).toLocaleString() : ""), d2 = (n) => (n >= 2 * q ? (f[n] - 2 * f[n - q] + f[n - 2 * q]).toLocaleString() : "");
+  $("facts").innerHTML = `<table id="counts">${row("day n", (n) => n)}${row("f(n)", (n) => f[n].toLocaleString())}${row(q > 1 ? `Δ<sub>${q}</sub>f` : "Δf", d1)}${row(q > 1 ? `Δ²<sub>${q}</sub>f` : "Δ²f", d2)}</table>`;
+  markDay(cur);
+}
+let marked = [];
+function markDay(d) {
+  for (const c of marked) c.classList.remove("cur");
+  marked = [...document.querySelectorAll(`#counts td[data-d="${d}"]`)];
+  for (const c of marked) c.classList.add("cur");
+  const box = $("facts"), c = marked[0];
+  if (c) {   // keep the current day's column in view, clear of the sticky row labels
+    const lw = box.querySelector("th")?.offsetWidth || 0, l = c.offsetLeft, r = l + c.offsetWidth;
+    if (l < box.scrollLeft + lw || r > box.scrollLeft + box.clientWidth) box.scrollLeft = Math.max(0, l - lw - (box.clientWidth - lw - c.offsetWidth) / 2);
+  }
+}
+
+$("bar").addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); run(); });
+$("inp").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 400); });
+document.querySelector("#title .logo").addEventListener("click", () => { const t = document.querySelector("#title .logo"); t.classList.remove("spin"); void t.getBoundingClientRect(); t.classList.add("spin"); });
+// Paper: pointillist speckle thickest at the window edges.
+function paper() {
+  const c = $("paper"), dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+  c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cols = ["#e9a9b4", "#a9b6e0", "#f0cf7d", "#c7b3dc", "#a9cfb4", "#f2b48d", "#9fb0d6"], band = Math.min(90, Math.min(W, H) * 0.12);
+  let seed = 5; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const n = Math.round((W + H) * 3.4);
+  for (let k = 0; k < n; k++) {
+    const x = R() * W, y = R() * H, d = Math.min(x, y, W - x, H - y) / band;
+    if (R() > Math.exp(-d * 2.2) * 0.9 + 0.012) continue;
+    g.globalAlpha = 0.35 + R() * 0.45; g.fillStyle = cols[(R() * cols.length) | 0];
+    g.beginPath(); g.arc(x, y, 0.8 + R() * 1.6, 0, 6.2832); g.fill();
+  }
+}
+paper(); addEventListener("resize", () => { clearTimeout(paper.t); paper.t = setTimeout(paper, 150); });
+// clicking any cell in the counts table jumps to that day
+// each day's column acts as one target: hovering lights the whole column, clicking anywhere in it goes to that day
+let hovCol = [];
+const hover = (d) => { for (const c of hovCol) c.classList.remove("hov"); hovCol = d == null ? [] : [...document.querySelectorAll(`#counts td[data-d="${d}"]`)]; for (const c of hovCol) c.classList.add("hov"); };
+$("facts").addEventListener("mouseover", (e) => { const c = e.target.closest("td[data-d]"); hover(c ? c.dataset.d : null); });
+$("facts").addEventListener("mouseleave", () => hover(null));
+$("facts").addEventListener("click", (e) => { const c = e.target.closest("td[data-d]"); if (c) setDay(+c.dataset.d); });
+$("toWeener").addEventListener("click", (e) => { e.preventDefault(); location.reload(); });   // the title reloads the page
+document.querySelector("#title .logo").addEventListener("animationend", (e) => e.currentTarget.classList.remove("spin"));
+for (const b of document.querySelectorAll("#help .ex")) b.addEventListener("click", () => { $("inp").value = b.textContent; $("help").open = false; clearTimeout(timer); run(); });
+document.addEventListener("click", (e) => { if ($("help").open && !$("help").contains(e.target)) $("help").open = false; });
+// Space plays or pauses (except while typing in the vectors box); Esc resets to day 0
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { e.preventDefault(); $("help").open = false; $("reset").click(); }
+  else if (e.key === " " && e.target !== $("inp") && !e.target.closest("select")) { e.preventDefault(); $("play").click(); }
+});
+$("play").addEventListener("click", () => { playing = !playing; $("play").textContent = playing ? "Pause" : "Play"; if (playing && reach && cur >= reach.maxDay) setDay(0); loop(); });
+$("day").addEventListener("input", () => { playing = false; $("play").textContent = "Play"; clearTimeout(tick); setDay(Number($("day").value)); });
+$("reset").addEventListener("click", () => { playing = false; clearTimeout(tick); $("play").textContent = "Play"; setDay(0); });   // back to day 0, paused
+// zoom: wheel zooms about the cursor, drag pans, double-click fits; buttons do the same about the centre
+function zoomAt(f, mx, my) {
+  if (!view) return;
+  const pp = Math.min(80, Math.max(view.fit.pp, view.pp * f)); f = pp / view.pp;
+  view.ox = mx - (mx - view.ox) * f; view.oy = my - (my - view.oy) * f; view.pp = pp;
+  if (pp === view.fit.pp) Object.assign(view, view.fit);
+  draw();
+}
+$("art").addEventListener("wheel", (e) => { e.preventDefault(); const r = $("art").getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+let drag = null;
+$("art").addEventListener("pointerdown", (e) => { if (!view) return; drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; $("art").setPointerCapture(e.pointerId); });
+$("art").addEventListener("pointermove", (e) => { if (!drag) return; view.ox = drag.ox + e.clientX - drag.x; view.oy = drag.oy + e.clientY - drag.y; draw(); });
+$("art").addEventListener("pointerup", () => { drag = null; });
+$("art").addEventListener("dblclick", () => { if (view) { Object.assign(view, view.fit); draw(); } });
+$("zin").addEventListener("click", () => view && zoomAt(2, view.W / 2, view.H / 2));
+$("zout").addEventListener("click", () => view && zoomAt(0.5, view.W / 2, view.H / 2));
+$("zfit").addEventListener("click", () => { if (view) { Object.assign(view, view.fit); draw(); } });
+PAINTINGS.forEach((P, k) => $("paint").add(new Option(`${P.title} (${P.year})`, k)));
+$("paint").addEventListener("change", () => { paintIdx = Number($("paint").value); buildArt(); });
+$("dots").addEventListener("input", () => { $("dotsv").textContent = $("dots").value; });
+$("dots").addEventListener("change", () => buildArt());
+new ResizeObserver(() => { clearTimeout(layout.t); layout.t = setTimeout(layout, 150); }).observe($("stage"));
+buildArt();
+run();
+</script>
+</body>
+</html>
