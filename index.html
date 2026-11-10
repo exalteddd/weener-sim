@@ -515,7 +515,7 @@
           </div>
         </div>
         <div>
-          <div class="field-top"><label for="pdRange">Preview length</label><output id="pdOut">30 days</output></div>
+          <div class="field-top"><label for="pdRange" title="The preview always runs until 5 days past the day the pattern settles; this sets the shortest it can be">Shortest preview</label><output id="pdOut">30 days</output></div>
           <input type="range" id="pdRange" min="10" max="80" value="30">
         </div>
         <label class="switch-row"><span>Ring the points the outline passes through</span><input type="checkbox" class="switch" id="ringsOpt"></label>
@@ -1496,7 +1496,7 @@ function onGrowth(job, res) {
   lastAnalysis = A;
   renderResults(A, res.ms);
   renderEdges(job.vecs, A, job.E);
-  Preview.setSim(job.vecs, res);
+  Preview.setSim(job.vecs, res, A);
   Research.run(job.vecs);
 }
 
@@ -1991,9 +1991,11 @@ const Preview = (() => {
   if (document.fonts) document.fonts.ready.then(() => { renderer.reset(); requestDraw(); });
 
   return {
-    setSim(vecs, res) {
+    // the preview runs until 5 days past the day the counts settle (the growth always runs further than that),
+    // and never shorter than the preview length setting
+    setSim(vecs, res, A) {
       sim = simFromGrowth(vecs, res, ++simSeq);
-      maxDay = Math.min(S.previewDays, res.days);
+      maxDay = Math.min(res.days, Math.max(S.previewDays, A && A.stable ? A.n0 + 5 : 0));
       dayRange.max = maxDay;
       dayPos = clamp(dayPos, 0, maxDay);
       if (dayTarget !== null) dayTarget = clamp(dayTarget, 0, maxDay);
