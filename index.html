@@ -153,6 +153,7 @@
   input.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.25); transition: transform .18s; }
   input.switch:checked { background: var(--accent); }
   input.switch:checked::after { transform: translateX(16px); }
+  input.switch:disabled, .switch-row:has(input.switch:disabled) { cursor: default; }
 
   input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin: 0; border-radius: 99px; outline-offset: 6px; cursor: pointer;
     background: linear-gradient(90deg, var(--accent) var(--p, 0%), #e3e8f0 var(--p, 0%)); }
@@ -1623,15 +1624,21 @@ function labelCells() {
 // derived from the password (PBKDF2-SHA256, 600,000 rounds), so neither the password nor the panels' code can
 // be read from this page. Unlocking remembers the key in this browser, so turning the panels off and on again
 // (or reloading) never asks for the password twice.
+// Only a browser that holds the key (the owner's) can flip the switch; everywhere else it doesn't move.
+// The owner's unlock link (#unlock=<key, base64url>) gives a browser the key once: the page checks it against the
+// encrypted panels, keeps it, turns the panels on and removes it from the address bar.
 const Research = (() => {
   let D = null, api = null, on = false;
   try { D = JSON.parse($('researchData').textContent); } catch {}
   const bytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
   const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  async function decrypt(raw) {                          // throws unless raw is the panels' key
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes(D.iv) }, key, bytes(D.ct));
+  }
   async function open(raw) {
     if (api) return;
-    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes(D.iv) }, key, bytes(D.ct));
+    const plain = await decrypt(raw);
     const { css, html, js } = JSON.parse(new TextDecoder().decode(plain));
     document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
     $('researchSlot').innerHTML = html;
@@ -1643,6 +1650,18 @@ const Research = (() => {
     if (!saved || !D || !crypto.subtle) return false;
     try { await open(bytes(saved)); return true; } catch { store.set('wsim:research', null); return false; }   // the page was re-locked with a new key
   }
+  async function openLink() {
+    const m = /(?:^#|&)unlock=([A-Za-z0-9_-]+)/.exec(location.hash);
+    if (!m) return false;
+    history.replaceState(null, '', location.pathname + location.search);   // never leave the key in the address bar
+    if (!D || !crypto.subtle) return false;
+    let raw;
+    try { raw = bytes(m[1].replace(/-/g, '+').replace(/_/g, '/')); await (api ? decrypt(raw) : open(raw)); } catch { return false; }   // not the key
+    store.set('wsim:research', b64(raw)); store.set('wsim:researchOn', true);
+    show(true);
+    return true;
+  }
+  addEventListener('hashchange', openLink);              // the link pasted into a tab that is already open
   function show(v) {
     on = v;
     document.body.classList.toggle('research-on', v);
@@ -1651,6 +1670,7 @@ const Research = (() => {
   }
   return {
     get on() { return on; },
+    get owner() { return !!D && !!store.get('wsim:research', null); },   // this browser was given the key
     run(vecs) { if (on) api?.run(vecs); },
     async unlock(password) {
       if (!D || !crypto.subtle) throw new Error('unavailable');
@@ -1662,13 +1682,16 @@ const Research = (() => {
       store.set('wsim:research', b64(raw)); store.set('wsim:researchOn', true);
       show(true);
     },
-    async turnOn() {                                    // no password for now: the switch just turns the section on.
-      await openSaved();                                // encrypted panels open only if this browser kept their key
+    async turnOn() {                                    // false unless this browser holds the key
+      if (!(await openSaved())) return false;
       store.set('wsim:researchOn', true); show(true);
       return true;
     },
     off() { store.set('wsim:researchOn', false); show(false); },
-    async restore() { if (store.get('wsim:researchOn', false)) { await openSaved(); show(true); } },
+    async restore() {
+      if (await openLink()) return;
+      if (store.get('wsim:researchOn', false) && await openSaved()) show(true);
+    },
   };
 })();
 
@@ -1696,11 +1719,16 @@ const Cipher = (() => {
   };
 })();
 const setDlg = $('setDlg'), researchOpt = $('researchOpt');
-$('setBtn').addEventListener('click', () => { researchOpt.checked = Research.on; setDlg.showModal(); Cipher.start(); });
+$('setBtn').addEventListener('click', () => {
+  researchOpt.checked = Research.on; researchOpt.disabled = !Research.owner && !Research.on;   // only the owner's browser can flip it
+  setDlg.showModal(); Cipher.start();
+});
 setDlg.addEventListener('close', () => Cipher.stop());
 $('setClose').addEventListener('click', () => setDlg.close());
-researchOpt.addEventListener('change', async () => {   // password turned off for now
-  if (researchOpt.checked) await Research.turnOn(); else Research.off();
+researchOpt.addEventListener('change', async () => {
+  if (!researchOpt.checked) { Research.off(); return; }
+  if (!Research.owner) { researchOpt.checked = false; return; }
+  researchOpt.checked = await Research.turnOn();
 });
 
 // ── Growth simulation ─────────────────────────────────────────────────────
