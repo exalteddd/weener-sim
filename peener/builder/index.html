@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8">
+<title>Ween Builder</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23e0352b'/%3E%3Ccircle cx='20' cy='8' r='4' fill='%232f6fd6'/%3E%3Ccircle cx='32' cy='8' r='4' fill='%23e2a400'/%3E%3Crect x='4' y='26' width='32' height='8' fill='%23261f1b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Courier+Prime&display=swap" rel="stylesheet">
+<style>
+/* Peener's paper: ruled sections, serif type. Left: the weens and walls as forms. Right: the text they make, and a picture of day 0. */
+:root {
+  --paper: #f7efe1; --ink: #2a2520; --ink-2: #6f6455; --rule: #d6c9b2; --field: #fbf6ec; --lav: #e4dbe9;
+  --red: #c9483a; --red-deep: #ad3a2e; --violet: #8a78b3;
+  --serif: 'EB Garamond', Garamond, Georgia, 'Times New Roman', serif;
+  --mono: 'Courier Prime', 'Courier New', ui-monospace, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 18px/1.35 var(--serif); -webkit-font-smoothing: antialiased;
+  padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); padding-block: 10px 30px; }
+.wrap { max-width: 1180px; margin: 0 auto; }
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+a { color: inherit; }
+
+header { display: flex; align-items: center; gap: 18px; padding: 4px 4px 12px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+header h1 { margin: 0; font: 500 26px/1 var(--serif); letter-spacing: .32em; text-transform: uppercase; white-space: nowrap; }
+header .sub { color: var(--ink-2); font-style: italic; }
+header .links { margin-left: auto; display: flex; gap: 22px; font-style: italic; font-size: 19px; }
+header .links a { text-decoration: none; } header .links a:hover { color: var(--red); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 26px; align-items: start; padding-top: 16px; }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+.add { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.add .lab { font-style: italic; color: var(--ink-2); margin-right: 4px; }
+button { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 16px; border-radius: 2px; border: 1px solid #b9ab94;
+  background: var(--field); font-style: italic; font-size: 17px; white-space: nowrap; cursor: pointer; }
+button:hover { background: #fff; border-color: var(--ink-2); }
+button.main { background: var(--red); border-color: var(--red); color: #fff; }
+button.main:hover { background: var(--red-deep); border-color: var(--red-deep); }
+button.icon { width: 34px; padding: 0; font-style: normal; }
+
+#items { display: grid; gap: 14px; }
+.card { background: var(--field); border: 1px solid var(--rule); border-left: 6px solid var(--sw, #999); padding: 12px 14px 14px; display: grid; gap: 10px; }
+.card .top { display: flex; align-items: center; gap: 10px; }
+.card .top h2 { margin: 0; font: 500 21px var(--serif); }
+.card .top .kind { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+.card .top .tools { margin-left: auto; display: flex; gap: 6px; }
+.row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 10px; align-items: start; }
+.row > .lbl { font-style: italic; padding-top: 6px; }
+@media (max-width: 560px) { .row { grid-template-columns: minmax(0, 1fr); gap: 4px; } .row > .lbl { padding-top: 0; } }
+.modes { display: inline-flex; border: 1px solid var(--rule); margin-bottom: 6px; }
+.modes button { height: 28px; border: 0; border-radius: 0; font-size: 15px; padding: 0 12px; background: transparent; }
+.modes button.on { background: var(--ink); color: var(--paper); }
+input[type=text], input[type=number], textarea { border: 1px solid var(--rule); background: #fffdf8; padding: 5px 8px; font: 16px var(--mono); border-radius: 2px; min-width: 0; }
+input[type=text]:focus, input[type=number]:focus, textarea:focus { outline: none; border-color: var(--ink-2); }
+input[type=text].wide, textarea.wide { width: 100%; }
+input[type=number] { width: 6.5em; }
+.fn { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-style: italic; }
+.fn input[type=text] { width: 10em; }
+.fn input[type=number] { width: 5.5em; }
+.checks { display: grid; gap: 8px; }
+.check { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 34px; }
+.check > label { display: inline-flex; align-items: center; gap: 10px; font-style: italic; cursor: pointer; }
+input[type=checkbox] { accent-color: var(--red); width: 20px; height: 20px; margin: 0; }
+input[type=color] { width: 42px; height: 32px; padding: 0 2px; border: 1px solid var(--rule); background: #fffdf8; cursor: pointer; }
+.hex { width: 7.5em !important; }
+.err { color: var(--red-deep); font-size: 15px; font-style: italic; }
+.code { font: 14px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.empty { color: var(--ink-2); font-style: italic; padding: 20px 4px; }
+
+aside { position: sticky; top: 10px; display: grid; gap: 14px; }
+.panel { background: var(--field); border: 1px solid var(--rule); padding: 12px 14px; display: grid; gap: 10px; }
+.panel h3 { margin: 0; font: 500 15px var(--serif); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+#out { width: 100%; min-height: 120px; resize: vertical; font: 15px/1.45 var(--mono); }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.acts a.btn { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 2px; background: var(--red); color: #fff; text-decoration: none; font-style: italic; font-size: 17px; }
+.acts a.btn:hover { background: var(--red-deep); }
+#prev { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; background: #fffdf8; border: 1px solid var(--rule); }
+.note { font-size: 15px; color: var(--ink-2); font-style: italic; }
+#toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 14px; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Ween Builder</h1>
+    <span class="sub">build your own weens!</span>
+    <span class="links"><a href="../" target="_blank" rel="noopener">Open Peener Sim ↗</a></span>
+  </header>
+
+  <div class="cols">
+    <main>
+      <div class="add">
+        <span class="lab">Add</span>
+        <button type="button" class="main" id="addWeen">+ Ween</button>
+        <button type="button" id="addWall">+ Wall</button>
+        <span class="lab" style="margin-left:14px">Start from</span>
+        <select id="preset" aria-label="Start from an example">
+          <option value="">an example…</option>
+          <option value="two">Two overlapping weens</option>
+          <option value="box">A ween boxed in by walls</option>
+          <option value="grow">A wall ween that grows</option>
+          <option value="ghost">A ween that ignores walls</option>
+        </select>
+        <button type="button" id="clearAll" style="margin-left:auto">Clear all</button>
+      </div>
+      <div id="items"></div>
+    </main>
+
+    <aside>
+      <div class="panel">
+        <h3>Your input</h3>
+        <textarea id="out" readonly spellcheck="false" aria-label="The input text for Peener Sim"></textarea>
+        <div class="acts">
+          <a class="btn" id="open" href="../" target="_blank" rel="noopener">Open in Peener Sim ↗</a>
+          <button type="button" id="copy">Copy</button>
+        </div>
+        <div class="err" id="outErr" hidden></div>
+      </div>
+      <div class="panel">
+        <h3>Day 0</h3>
+        <canvas id="prev" width="440" height="440" aria-label="Where each ween starts and where the walls are"></canvas>
+        <div class="note" id="prevNote">● ween  ◆ wall ween  ■ wall.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PALETTE = ["#e0352b", "#2f6fd6", "#e2a400", "#2e9d5b", "#8e44ad", "#e67e22", "#16a5a5", "#d63384"];
+const WALL = "#26211d", WALLWEEN = "#56607a";   // plain walls near-black; wall weens slate
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ── state ────────────────────────────────────────────────────────────────────────────────────────
+// a set of points is { mode: "points" | "fn" | "text", points, fx, fy, from, to, step, text }
+const pointSet = (points, fn) => ({ mode: fn ? "fn" : "points", points: points || "", fx: fn ? fn[0] : "t", fy: fn ? fn[1] : "0", from: fn ? fn[2] : -10, to: fn ? fn[3] : 10, step: 1, text: "" });
+const newWeen = (k, o = {}) => ({ kind: "ween", starts: pointSet("0,0"), moves: pointSet("1,0 0,1 -1,-1"),
+  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, wall: false, blocked: true, ...o });
+const newWall = (o = {}) => ({ kind: "wall", pts: pointSet("", ["t", "10", -20, 20]), color: WALL, ...o });
+let items = [];
+try { items = JSON.parse(localStorage.getItem("weenbuilder:v1") || "null") || []; } catch { items = []; }
+if (!Array.isArray(items) || !items.length) items = [newWeen(0)];
+const save = () => { try { localStorage.setItem("weenbuilder:v1", JSON.stringify(items)); } catch {} };
+
+// ── points → Peener text, and a light check ───────────────────────────────────────────────────────
+const NUM = String.raw`-?\d+(?:\.\d+)?(?:\/\d+)?`;
+function pointsText(ps) {
+  if (ps.mode === "text") return { text: ps.text.trim(), err: ps.text.trim() ? "" : "Type some points." };
+  if (ps.mode === "fn") {
+    const fx = ps.fx.trim(), fy = ps.fy.trim();
+    if (!fx || !fy) return { text: "", err: "Fill in both x and y." };
+    if (!/^[\w\s+\-*/^%().,]*$/.test(fx + fy)) return { text: "", err: "x and y can use numbers, t, + − * / ^, ( ), pi and round sin cos sqrt abs min max floor." };
+    const a = Number(ps.from), b = Number(ps.to), st = Number(ps.step) || 1;
+    if (!Number.isInteger(a) || !Number.isInteger(b)) return { text: "", err: "The range for t needs whole numbers." };
+    if (b < a) return { text: "", err: "The range for t runs backwards." };
+    if (!Number.isInteger(st) || st < 1) return { text: "", err: "The step must be a whole number of 1 or more." };
+    return { text: `<${fx}, ${fy}> t=${a}..${b}${st !== 1 ? ` step ${st}` : ""}`, err: "" };
+  }
+  const raw = ps.points.trim();
+  if (!raw) return { text: "", err: "" };
+  const re = new RegExp(String.raw`[(\[]?\s*(${NUM})\s*,\s*(${NUM})\s*[)\]]?`, "g");
+  const pairs = []; let m, used = "";
+  while ((m = re.exec(raw))) { pairs.push(`[${m[1]},${m[2]}]`); used += m[0]; }
+  const leftover = raw.replace(re, "").replace(/[\s,;]/g, "");
+  if (leftover) return { text: "", err: `Can't read "${leftover.slice(0, 20)}". Write points as x,y pairs, like 0,1 2,-1.` };
+  return { text: pairs.join(" "), err: "" };
+}
+const hexOk = (h) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(h);
+function itemText(it) {
+  if (it.kind === "wall") {
+    const p = pointsText(it.pts);
+    if (p.err || !p.text) return { text: "", err: p.err || "Give the wall some points." };
+    return { text: `wall{${p.text}${hexOk(it.color) && it.color.toLowerCase() !== WALL ? ` ; color ${it.color}` : ""}}`, err: "" };
+  }
+  const s = pointsText(it.starts), m = pointsText(it.moves);
+  if (s.err) return { text: "", err: "Starts: " + s.err };
+  if (!s.text) return { text: "", err: "Starts: give at least one point." };
+  if (m.err) return { text: "", err: "Moves: " + m.err };
+  const opts = [];
+  if (it.useDay && Number(it.day) > 0) opts.push(`day ${Math.round(Number(it.day))}`);
+  if (it.useColor && hexOk(it.color)) opts.push(`color ${it.color}`);
+  if (it.useWeight && Number(it.weight) !== 1 && Number.isFinite(Number(it.weight))) opts.push(`weight ${Number(it.weight)}`);
+  if (it.wall) opts.push("wall");
+  if (!it.blocked) opts.push("ignores walls");
+  return { text: `{${s.text}${m.text ? " : " + m.text : ""}${opts.map((o) => " ; " + o).join("")}}`, err: "" };   // no moves: no colon
+}
+
+// ── forms ─────────────────────────────────────────────────────────────────────────────────────────
+function pointsForm(key, ps, label) {
+  const modes = [["points", "Points"], ["fn", "Function"], ["text", "Text"]].map(([v, t]) => `<button type="button" data-mode="${key}:${v}" class="${ps.mode === v ? "on" : ""}">${t}</button>`).join("");
+  let body;
+  if (ps.mode === "points") body = `<input type="text" class="wide" data-f="${key}.points" value="${esc(ps.points)}" placeholder="0,1 2,-1 …" spellcheck="false">`;
+  else if (ps.mode === "fn") body = `<div class="fn">x = <input type="text" data-f="${key}.fx" value="${esc(ps.fx)}" aria-label="x of t" spellcheck="false">
+      y = <input type="text" data-f="${key}.fy" value="${esc(ps.fy)}" aria-label="y of t" spellcheck="false"> for t from
+      <input type="number" data-f="${key}.from" value="${esc(ps.from)}" aria-label="t from"> to <input type="number" data-f="${key}.to" value="${esc(ps.to)}" aria-label="t to">
+      step <input type="number" data-f="${key}.step" value="${esc(ps.step)}" min="1" aria-label="step"></div>`;
+  else body = `<input type="text" class="wide" data-f="${key}.text" value="${esc(ps.text)}" placeholder="anything Peener accepts, e.g. <round(9cos(2pi t/12)), round(9sin(2pi t/12))> t=0..11" spellcheck="false">`;
+  return `<div class="row"><span class="lbl">${label}</span><div><div class="modes" role="group" aria-label="${label}">${modes}</div>${body}</div></div>`;
+}
+function render() {
+  const box = $("items");
+  if (!items.length) { box.innerHTML = `<div class="empty">Nothing yet. Add a ween or a wall.</div>`; update(); return; }
+  let wn = 0, wl = 0;
+  box.innerHTML = items.map((it, i) => {
+    const title = it.kind === "wall" ? `Wall ${++wl}` : `Ween ${++wn}`;
+    const sw = it.kind === "wall" ? it.color : it.useColor ? it.color : it.wall ? WALLWEEN : PALETTE[(wn - 1) % PALETTE.length];
+    const tools = `<span class="tools"><button type="button" class="icon" data-act="up:${i}" title="Move up" aria-label="Move up">↑</button><button type="button" class="icon" data-act="down:${i}" title="Move down" aria-label="Move down">↓</button><button type="button" data-act="dup:${i}">Duplicate</button><button type="button" data-act="del:${i}">Remove</button></span>`;
+    const colour = (on) => `<input type="color" data-f="color" value="${hexOk(it.color) && it.color.length === 7 ? it.color : "#000000"}" ${on ? "" : "disabled"} aria-label="Colour"><input type="text" class="hex" data-f="color" value="${esc(it.color)}" ${on ? "" : "disabled"} aria-label="Colour as hex" spellcheck="false">`;
+    let body;
+    if (it.kind === "wall") {
+      body = pointsForm("pts", it.pts, "Wall points") +
+        `<div class="row"><span class="lbl">Colour</span><div class="check">${colour(true)}</div></div>
+         <div class="note">A wall never grows and isn't counted. Weens can't land on it or cross it.</div>`;
+    } else {
+      body = pointsForm("starts", it.starts, "Starts at") + pointsForm("moves", it.moves, "Moves") +
+        `<div class="row"><span class="lbl">Options</span><div class="checks">
+          <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="number" data-f="day" min="0" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} aria-label="Start day"></div>
+          <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
+          <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="number" data-f="weight" step="any" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} aria-label="Weight"></div>
+          <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: other weens can't land on or cross its dots</label></div>
+          <div class="check"><label><input type="checkbox" data-f="blocked" ${it.blocked ? "checked" : ""}> Blocked by walls</label></div>
+        </div></div>`;
+    }
+    const t = itemText(it);
+    return `<section class="card" data-i="${i}" style="--sw:${esc(sw)}"><div class="top"><h2>${title}</h2><span class="kind">${it.kind === "wall" ? "wall" : it.wall ? "wall ween" : "ween"}</span>${tools}</div>${body}
+      <div class="${t.err ? "err" : "code"}" data-msg>${esc(t.err || t.text)}</div></section>`;
+  }).join("");
+  update();
+}
+// typing updates the text and picture without rebuilding the form (so focus stays put)
+function refreshCard(i) {
+  const card = document.querySelector(`.card[data-i="${i}"]`); if (!card) return;
+  const t = itemText(items[i]), msg = card.querySelector("[data-msg]");
+  msg.className = t.err ? "err" : "code"; msg.textContent = t.err || t.text;
+  const it = items[i];
+  if (it.kind === "wall" || it.useColor) card.style.setProperty("--sw", it.color);
+}
+function fullText() {
+  const parts = [], errs = [];
+  let wn = 0, wl = 0;
+  items.forEach((it) => { const t = itemText(it), name = it.kind === "wall" ? `Wall ${++wl}` : `Ween ${++wn}`; if (t.err) errs.push(`${name}: ${t.err}`); else if (t.text) parts.push(t.text); });
+  if (!items.some((it) => it.kind === "ween")) errs.push("Add at least one ween: walls alone have nothing to grow.");
+  return { text: parts.join(" "), errs };
+}
+function update() {
+  const { text, errs } = fullText();
+  $("out").value = text;
+  $("open").href = "../#in=" + encodeURIComponent(text);
+  $("outErr").hidden = !errs.length; $("outErr").innerHTML = errs.map(esc).join("<br>");
+  save(); preview();
+}
+
+// ── day-0 picture: starts, walls and one day of moves (function mode is evaluated here too) ──────────
+function evalFn(src, t) {
+  const s = src.replace(/\s+/g, "").replace(/\*\*/g, "^").replace(/(\d)(t|pi|\()/g, "$1*$2").replace(/\)(\(|t|\d)/g, ")*$1").replace(/t\(/g, "t*(");
+  const toks = s.match(/\d+(?:\.\d+)?|[a-z]+|[-+*/^%(),]/gi) || [];
+  let i = 0;
+  const F = { round: Math.round, floor: Math.floor, ceil: Math.ceil, sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan, abs: Math.abs, min: Math.min, max: Math.max };
+  const atom = () => {
+    const k = toks[i++];
+    if (k === undefined) throw 0;
+    if (/^\d/.test(k)) return Number(k);
+    if (k === "t") return t; if (k === "pi") return Math.PI;
+    if (k === "(") { const v = expr(); i++; return v; }
+    if (k === "-") return -pow(); if (k === "+") return pow();
+    if (F[k]) { i++; const a = [expr()]; while (toks[i] === ",") { i++; a.push(expr()); } i++; return F[k](...a); }
+    throw 0;
+  };
+  const pow = () => { const b = atom(); if (toks[i] === "^") { i++; return b ** pow(); } return b; };
+  const term = () => { let v = pow(); while ("*/%".includes(toks[i]) && toks[i]) { const o = toks[i++], w = pow(); v = o === "*" ? v * w : o === "/" ? v / w : v % w; } return v; };
+  const expr = () => { let v = term(); while (toks[i] === "+" || toks[i] === "-") { const o = toks[i++], w = term(); v = o === "+" ? v + w : v - w; } return v; };
+  const v = expr(); if (i !== toks.length) throw 0; return v;
+}
+function pointsOf(ps) {
+  if (ps.mode === "text") return null;
+  if (ps.mode === "points") { const out = []; const re = new RegExp(String.raw`(${NUM})\s*,\s*(${NUM})`, "g"); let m; while ((m = re.exec(ps.points))) out.push([eval1(m[1]), eval1(m[2])]); return out; }
+  const out = [], a = Number(ps.from), b = Number(ps.to), st = Math.max(1, Number(ps.step) || 1);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || (b - a) / st > 4000) return null;
+  try { for (let t = a; t <= b; t += st) out.push([evalFn(ps.fx, t), evalFn(ps.fy, t)]); } catch { return null; }
+  return out;
+}
+function eval1(s) { const [p, q] = s.split("/"); return Number(p) / (q ? Number(q) : 1); }
+const niceStep = (span, target = 8) => { const raw = span / target, e = 10 ** Math.floor(Math.log10(raw)); for (const m of [1, 2, 5, 10]) if (m * e >= raw) return m * e; return 10 * e; };
+const startDay = (it) => (it.useDay ? Math.max(0, Math.round(Number(it.day) || 0)) : 0);
+// day 0: weens growing from day 0 are filled; weens that start later are hollow and faded, labelled with their day
+function preview() {
+  const c = $("prev"), g = c.getContext("2d"), W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H);
+  const draw = [], walls = [];
+  let wn = 0, skipped = 0, later = 0;
+  for (const it of items) {
+    if (it.kind === "wall") { const P = pointsOf(it.pts); if (P) walls.push({ P, color: hexOk(it.color) ? it.color : WALL }); else skipped++; continue; }
+    const S = pointsOf(it.starts), M = pointsOf(it.moves), col = it.useColor && hexOk(it.color) ? it.color : PALETTE[wn % PALETTE.length]; wn++;
+    if (!S) { skipped++; continue; }
+    const day = startDay(it); if (day > 0) later++;
+    draw.push({ S, M: M || [], col: it.wall ? (it.useColor && hexOk(it.color) ? it.color : WALLWEEN) : col, wall: it.wall, day });
+  }
+  const pts = [...walls.flatMap((w) => w.P), ...draw.flatMap((d) => [...d.S, ...(d.S[0] ? d.M.map((m) => [d.S[0][0] + m[0], d.S[0][1] + m[1]]) : [])])].filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  pts.push([0, 0]);
+  const x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0])), y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+  // plot area inside margins for the axis numbers
+  const ML = 40, MB = 30, MT = 12, MR = 14, PW = W - ML - MR, PH = H - MT - MB;
+  const span = Math.max(x1 - x0, y1 - y0, 4) + 2, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, s = Math.min(PW, PH) / span;
+  const X = (x) => ML + PW / 2 + (x - cx) * s, Y = (y) => MT + PH / 2 - (y - cy) * s;
+  const vx0 = cx - PW / 2 / s, vx1 = cx + PW / 2 / s, vy0 = cy - PH / 2 / s, vy1 = cy + PH / 2 / s, st = niceStep(Math.max(vx1 - vx0, vy1 - vy0));
+  g.fillStyle = "#fffdf8"; g.fillRect(ML, MT, PW, PH);
+  // grid every step, axes through 0, numbers along the bottom and the left
+  g.lineWidth = 1; g.strokeStyle = "#efe6d6"; g.beginPath();
+  for (let v = Math.ceil(vx0 / st) * st; v <= vx1; v += st) { g.moveTo(Math.round(X(v)) + 0.5, MT); g.lineTo(Math.round(X(v)) + 0.5, MT + PH); }
+  for (let v = Math.ceil(vy0 / st) * st; v <= vy1; v += st) { g.moveTo(ML, Math.round(Y(v)) + 0.5); g.lineTo(ML + PW, Math.round(Y(v)) + 0.5); }
+  g.stroke();
+  g.strokeStyle = "#a89a82"; g.lineWidth = 1.2; g.beginPath();
+  if (vx0 <= 0 && 0 <= vx1) { g.moveTo(Math.round(X(0)) + 0.5, MT); g.lineTo(Math.round(X(0)) + 0.5, MT + PH); }
+  if (vy0 <= 0 && 0 <= vy1) { g.moveTo(ML, Math.round(Y(0)) + 0.5); g.lineTo(ML + PW, Math.round(Y(0)) + 0.5); }
+  g.stroke();
+  g.fillStyle = "#6f6455"; g.font = "12px Georgia, serif"; g.textBaseline = "top"; g.textAlign = "center";
+  const lab = (v) => String(+v.toFixed(6)).replace("-", "−");
+  for (let v = Math.ceil(vx0 / st) * st; v <= vx1; v += st) { g.fillRect(Math.round(X(v)), MT + PH, 1, 4); g.fillText(lab(v), X(v), MT + PH + 6); }
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let v = Math.ceil(vy0 / st) * st; v <= vy1; v += st) { g.fillRect(ML - 4, Math.round(Y(v)), 4, 1); g.fillText(lab(v), ML - 7, Y(v)); }
+  g.font = "italic 13px Georgia, serif"; g.textAlign = "right"; g.textBaseline = "bottom"; g.fillText("x", ML + PW - 3, MT + PH - 3);
+  g.textAlign = "left"; g.textBaseline = "top"; g.fillText("y", ML + 4, MT + 3);
+  g.strokeStyle = "#d6c9b2"; g.lineWidth = 1; g.strokeRect(ML + 0.5, MT + 0.5, PW - 1, PH - 1);
+  // the items, clipped to the plot
+  g.save(); g.beginPath(); g.rect(ML, MT, PW, PH); g.clip();
+  const sq = Math.max(2, s * 0.9), r = Math.max(2.5, Math.min(7, s * 0.4));
+  for (const w of walls) { g.fillStyle = w.color; for (const p of w.P) g.fillRect(X(p[0]) - sq / 2, Y(p[1]) - sq / 2, sq, sq); }
+  for (const d of draw) {
+    const now = d.day === 0;
+    g.globalAlpha = now ? 1 : 0.5; g.fillStyle = d.col; g.strokeStyle = d.col; g.lineWidth = 1.6;
+    for (const p of d.S) {
+      if (d.wall) {   // a wall ween is a diamond, a plain wall a square
+        const h = Math.max(2.5, sq * 0.62), x = X(p[0]), y = Y(p[1]);
+        g.beginPath(); g.moveTo(x, y - h); g.lineTo(x + h, y); g.lineTo(x, y + h); g.lineTo(x - h, y); g.closePath();
+        if (now) g.fill(); else g.stroke();
+      }
+      else { g.beginPath(); g.arc(X(p[0]), Y(p[1]), r, 0, 6.2832); if (now) g.fill(); else g.stroke(); }
+    }
+    if (d.S[0]) {
+      g.setLineDash(now ? [] : [4, 3]); g.lineWidth = 1.5; g.globalAlpha = now ? 0.8 : 0.45;
+      for (const m of d.M) { g.beginPath(); g.moveTo(X(d.S[0][0]), Y(d.S[0][1])); g.lineTo(X(d.S[0][0] + m[0]), Y(d.S[0][1] + m[1])); g.stroke(); }
+      g.setLineDash([]);
+      if (!now) { g.globalAlpha = 0.9; g.font = "italic 13px Georgia, serif"; g.textAlign = "left"; g.textBaseline = "bottom"; g.fillText(`day ${d.day}`, X(d.S[0][0]) + r + 3, Y(d.S[0][1]) - r); }
+    }
+    g.globalAlpha = 1;
+  }
+  g.restore();
+  $("prevNote").textContent = "● ween  ◆ wall ween  ■ wall.  Hollow shapes start later (labelled with their day). Lines: one day of moves from the first start."
+    + (skipped ? ` (${skipped} item${skipped === 1 ? "" : "s"} typed as text not shown.)` : "");
+}
+// ── events ────────────────────────────────────────────────────────────────────────────────────────
+function setField(it, path, v) { const ks = path.split("."); let o = it; for (let k = 0; k < ks.length - 1; k++) o = o[ks[k]]; o[ks[ks.length - 1]] = v; }
+$("items").addEventListener("input", (e) => {
+  const el = e.target, card = el.closest(".card"); if (!card || !el.dataset.f) return;
+  const i = Number(card.dataset.i), it = items[i], f = el.dataset.f;
+  if (el.type === "checkbox") { setField(it, f, el.checked); render(); return; }
+  setField(it, f, el.value);
+  if (f === "color") { for (const o of card.querySelectorAll('[data-f="color"]')) if (o !== el && (el.type === "text" ? hexOk(el.value) && el.value.length === 7 : true)) o.value = el.value; }
+  refreshCard(i); update();
+});
+$("items").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.mode) { const card = b.closest(".card"), i = Number(card.dataset.i), [key, mode] = b.dataset.mode.split(":"); items[i][key].mode = mode; render(); return; }
+  if (!b.dataset.act) return;
+  const [act, k] = b.dataset.act.split(":"), i = Number(k);
+  if (act === "del") items.splice(i, 1);
+  else if (act === "dup") items.splice(i + 1, 0, JSON.parse(JSON.stringify(items[i])));
+  else if (act === "up" && i > 0) [items[i - 1], items[i]] = [items[i], items[i - 1]];
+  else if (act === "down" && i < items.length - 1) [items[i + 1], items[i]] = [items[i], items[i + 1]];
+  render();
+});
+// new weens and walls go to the top, and the page scrolls to them
+function addFirst(it) { items.unshift(it); render(); const c = document.querySelector('.card[data-i="0"]'); if (c) { c.scrollIntoView({ block: "nearest", behavior: "smooth" }); c.querySelector("input[type=text]")?.focus({ preventScroll: true }); } }
+$("addWeen").addEventListener("click", () => addFirst(newWeen(items.filter((x) => x.kind === "ween").length)));
+$("addWall").addEventListener("click", () => addFirst(newWall()));
+$("clearAll").addEventListener("click", () => { items = []; render(); });
+$("preset").addEventListener("change", () => {
+  const v = $("preset").value; $("preset").value = "";
+  const P = (pts) => ({ ...pointSet(pts) }), FN = (fx, fy, a, b) => pointSet("", [fx, fy, a, b]);
+  if (v === "two") items = [newWeen(0, { starts: P("0,1") }), newWeen(1, { starts: P("1,1") })];
+  else if (v === "box") items = [newWall({ pts: FN("t", "12", -12, 12) }), newWall({ pts: FN("t", "-12", -12, 12) }), newWall({ pts: FN("12", "t", -12, 12) }), newWall({ pts: FN("-12", "t", -12, 12) }), newWeen(0)];
+  else if (v === "grow") items = [newWeen(0, { starts: P("0,10"), moves: P("1,0 -1,0"), wall: true, useColor: false, color: WALLWEEN }), newWeen(1)];
+  else if (v === "ghost") items = [newWall({ pts: FN("t", "6", -15, 15) }), newWeen(0), newWeen(1, { starts: P("3,0"), blocked: false })];
+  if (v) render();
+});
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 1600); }
+$("copy").addEventListener("click", () => {
+  const v = $("out").value;
+  const fb = () => { $("out").select(); let ok = false; try { ok = document.execCommand("copy"); } catch {} toast(ok ? "Copied" : "Select the text and copy it"); };
+  try { navigator.clipboard.writeText(v).then(() => toast("Copied"), fb); } catch { fb(); }
+});
+render();
+</script>
+</body>
+</html>
