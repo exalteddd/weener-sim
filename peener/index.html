@@ -213,6 +213,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>{&lt;t,t&gt; t=0..5 : &lt;t,0&gt; ; weight t ; sum}</code> the moves can use the starting dots' t without a range of their own; defining t again in the moves is an error, since then the options couldn't tell which t they mean. In the options t is each starting dot and n is the day</li>
     <li><code>wall{&lt;t, 12&gt; t=-40..40 ; color #555}</code> a plain wall: it blocks weens but never grows and isn't counted; a one-variable formula is drawn as a solid line, so <code>wall{&lt;t, 3t&gt; t=-9..9}</code> has no gaps</li>
     <li><code>{[0,0] : [1,0] [0,1] ; ignores walls}</code> a ween that passes through every wall</li>
+    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; color hsl(30n, 80%, 50%)}</code> a colour formula in n: each dot gets the colour of the day it appeared, so the ween shows its growth in rings</li>
     <li><code>{&lt;t, 0&gt; t=0..20 : [0,1] ; lifespan t+1 ; color hsl(18t, 80%, 50%)}</code> a ween written with its own variable uses it in every option: each starting dot t, and everything it grows into, gets its own lifespan, weight and colour (a dot belongs to the starting dot that reaches it first; on a tie, the earlier one). Such a ween has no n; without its own variable, n is the day</li>
     <li><code>{&lt;3k, 0&gt; k=1.. ; day 3k ; no moves}</code> dots that keep appearing: one at (3k, 0) on day 3k for every k, forever (<code>k=1..</code> has no end; the day is a formula in k). Add moves to make each one grow: <code>{&lt;3k, 0&gt; k=1.. : [0,1] [0,-1] ; day 3k}</code></li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10}</code> each dot of this ween vanishes 10 days after it appears, so it spreads as a band 10 days thick; it never grows back where it has been, and a wall ween's dots stop blocking once they vanish</li>
@@ -1303,7 +1304,6 @@ function parseInput(text) {
         const mine = names.some((v) => own.includes(v)), byDay = names.includes("n");
         if (mine && byDay) throw new Error(`The ${what} uses both ${own[0]} (each starting dot) and n (the day); one option can use only one of them.`);
         if (mine) { perDot[what] = txt; continue; }   // one value per starting dot
-        if (what === "colour") throw new Error(`A colour can't change with the day n; use the starting dots' ${own[0]}, like hsl(30${own[0]}, 80%, 50%).`);
       }
       if (what === "lifespan") {
         const L0 = Number(txt), v = Number.isFinite(L0) ? L0 : dayFormula(txt, "lifespan");
@@ -1314,8 +1314,13 @@ function parseInput(text) {
       } else if (what === "weight") { const w = parseWeight(txt); if (typeof w === "number") opt.weight = w; else opt.wexpr = w.expr; }
       else {
         const rgb = parseColour(txt);
-        if (!rgb) throw new Error(`"${txt}" is not a colour. Try red, gold, #2f6fd6, rgb(40,120,200), or hsl(30t, 80%, 50%) with the ween's own variable.`);
-        opt.color = txt; opt.rgb = rgb;
+        if (rgb) { opt.color = txt; opt.rgb = rgb; continue; }
+        // a colour formula in n: each dot gets the colour of the day it appeared, like hsl(30n, 80%, 50%)
+        if (/^\s*(?:hsla?|rgba?)\s*\(/i.test(txt) && names.length && names.every((v) => v === "n")) {
+          let first; try { first = colourAt(txt, { n: 0 }); } catch (e) { throw new Error(`The colour ${txt} can't be worked out: ${e.message}`); }
+          opt.color = txt; opt.colorDay = txt; opt.rgb = first; continue;
+        }
+        throw new Error(`"${txt}" is not a colour. Try red, gold, #2f6fd6, rgb(40,120,200), hsl(30t, 80%, 50%) with the ween's own variable, or hsl(30n, 80%, 50%) to colour each dot by the day it appears.`);
       }
     }
     if (opt.dayExpr && own.length) { const bad = namesIn(opt.dayExpr).find((v) => !own.includes(v)); if (bad) throw new Error(bad === "n" ? `A starting dot's day can't depend on the day n; write it in ${own[0]}, like day 3${own[0]}.` : `"${bad}" isn't defined in this ween; its starting dots use ${own.join(", ")}.`); }
@@ -1781,7 +1786,9 @@ let forGroups = null, forSimple = true;
 // ween k at painting point t: its lifespan (for a dot that appeared on day born), colour and weight — the starting dot's
 // own for a ween written with its own variable
 const lifeHere = (k, t, born) => { const g = reach.groups[k]; return g.slife ? g.slife[reach.srcOf[k][t]] : reach.lifeOf[k](born); };
-const rgbHere = (k, t) => { const g = reach.groups[k]; return g.srgb ? g.srgb[reach.srcOf[k][t]] : g.rgb; };
+const dayRgb = new Map();   // colour formulas in n, by day
+const rgbOnDay = (g, d) => { const key = g.colorDay + "|" + d; let c = dayRgb.get(key); if (!c) { try { c = colourAt(g.colorDay, { n: d }); } catch { c = g.rgb; } dayRgb.set(key, c); } return c; };
+const rgbHere = (k, t) => { const g = reach.groups[k]; return g.colorDay ? rgbOnDay(g, reach.dayOf[k][t]) : g.srgb ? g.srgb[reach.srcOf[k][t]] : g.rgb; };
 const wHere = (k, t, Wd) => { const g = reach.groups[k]; return g.sumW ? reach.wOf[k][t] : g.swt ? g.swt[reach.srcOf[k][t]] : Wd[k]; };
 // a point's colour on day d: the weight-weighted mix of the colours of the weens that hold it (one plain ween: the reds)
 function cellColour(t, d) {
@@ -1942,7 +1949,7 @@ function legend(geo) {
   const G = geo && geo.general ? geo.groups : null;
   if ((!G || (G.length === 1 && G[0].plain && !G[0].day)) && !textWallGroups.length) { $("legend").innerHTML = ""; $("legendMore").hidden = true; return; }
   if (!G) { $("legend").innerHTML = textWallGroups.map((w) => `<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dots</span>`).join(""); foldLegend(); return; }
-  const sw = (g) => (g.srgb ? `linear-gradient(90deg, ${Array.from({ length: Math.min(6, g.srgb.length) }, (_, i) => `rgb(${g.srgb[Math.round(i * (g.srgb.length - 1) / Math.max(1, Math.min(6, g.srgb.length) - 1))].join(",")})`).join(", ")})` : `rgb(${g.rgb.join(",")})`);
+  const sw = (g) => (g.colorDay ? `linear-gradient(90deg, ${[0, 4, 8, 12, 16, 20].map((d) => `rgb(${rgbOnDay(g, d).join(",")})`).join(", ")})` : g.srgb ? `linear-gradient(90deg, ${Array.from({ length: Math.min(6, g.srgb.length) }, (_, i) => `rgb(${g.srgb[Math.round(i * (g.srgb.length - 1) / Math.max(1, Math.min(6, g.srgb.length) - 1))].join(",")})`).join(", ")})` : `rgb(${g.rgb.join(",")})`);
   const items = G.map((g, k) => `<span><i style="background:${sw(g)}"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""}${g.dayExpr ? ` · dots appear on day ${g.dayExpr}${g.spawnOpen ? ", forever" : ""}` : ` · day ${g.day}`}${g.lifeSrc ? ` · dots last ${g.lifeSrc} days` : g.lifeExpr ? ` · dots last ${g.lifeExpr.replace(/\s+/g, " ")} days` : g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${wText(g)}</span>`);
   for (const w of textWallGroups) items.push(`<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dot${w.pts.length === 1 ? "" : "s"}</span>`);
   $("legend").innerHTML = items.join("");
@@ -2787,7 +2794,7 @@ function run() {
       const scaleDays = (P, D) => { const mp = new Map(); P.forEach((p, i) => { const sp = p.map((v) => Math.round(v * q)), key = sp + ""; if (!mp.has(key)) mp.set(key, [sp, D[i]]); }); const v = [...mp.values()]; return [v.map((e) => e[0]), v.map((e) => e[1])]; };
       const G = groups.map((g, k) => ({ ...(g.sdays ? (([S, D]) => ({ starts: S, sdays: D }))(scaleDays(g.starts, g.sdays)) : { starts: scale(g.starts), sdays: null }),
         spawnOpen: !!g.spawnOpen, dayExpr: g.dayExpr || null, horizon: g.horizon,
-        slife: g.slife || null, swt: g.swt || null, srgb: g.srgb || null, sumW: !!g.sumW, combine: g.combine || null, svals: g.svals || null, perStart: !!g.perStart, lifeSrc: g.lifeSrc || null, wtSrc: g.wtSrc || null, colorSrc: g.colorSrc || null,
+        slife: g.slife || null, swt: g.swt || null, srgb: g.srgb || null, colorDay: g.colorDay || null, sumW: !!g.sumW, combine: g.combine || null, svals: g.svals || null, perStart: !!g.perStart, lifeSrc: g.lifeSrc || null, wtSrc: g.wtSrc || null, colorSrc: g.colorSrc || null,
         moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight, wexpr: g.wexpr || null,
         rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, lifeExpr: g.lifeExpr || null, plain: !g.wall && !g.ghost && !g.life && !g.lifeExpr && !g.color && !g.wexpr && !g.sdays && !g.perStart && !g.sumW && (g.weight == null || g.weight === 1) }));
       // dots that keep appearing add to the growth: count with room for two more degrees, and fit whatever degree it is
