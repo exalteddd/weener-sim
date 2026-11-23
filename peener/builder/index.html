@@ -85,6 +85,8 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .acts a.btn { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 2px; background: var(--red); color: #fff; text-decoration: none; font-style: italic; font-size: 17px; }
 .acts a.btn:hover { background: var(--red-deep); }
+.prevHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.prevHead .modes { margin-bottom: 0; }
 #prev { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; background: #fffdf8; border: 1px solid var(--rule); }
 .note { font-size: 15px; color: var(--ink-2); font-style: italic; }
 #impBox { margin-bottom: 14px; }
@@ -146,7 +148,7 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
         <div class="err" id="outErr" hidden></div>
       </div>
       <div class="panel">
-        <h3>Day 0</h3>
+        <div class="prevHead"><h3>Preview</h3><div class="modes" id="prevTabs" role="tablist" aria-label="Preview"><button type="button" role="tab" data-view="starts" class="on" aria-selected="true">Starting points</button><button type="button" role="tab" data-view="moves" aria-selected="false">Moves</button></div></div>
         <canvas id="prev" width="440" height="440" aria-label="Where each ween starts and where the walls are"></canvas>
         <div class="note" id="prevNote">● ween  ◆ wall ween  ■ wall.</div>
       </div>
@@ -429,22 +431,28 @@ const solid = (ps, P) => (P && (ps.mode === "fn" || oneVarText(ps)) ? joinLine(P
 function eval1(s) { const [p, q] = s.split("/"); return Number(p) / (q ? Number(q) : 1); }
 const niceStep = (span, target = 8) => { const raw = span / target, e = 10 ** Math.floor(Math.log10(raw)); for (const m of [1, 2, 5, 10]) if (m * e >= raw) return m * e; return 10 * e; };
 const startDay = (it) => (it.useDay ? Math.max(0, Math.round(Number(it.day) || 0)) : 0);
-// day 0: weens growing from day 0 are filled; weens that start later are hollow and faded, labelled with their day
+// The preview has two tabs. Starting points: day 0, with weens growing from day 0 filled and those that start later
+// hollow and faded, labelled with their day. Moves: each ween's moves as arrows from a dot at 0,0.
+let prevView = "starts";
+try { if (localStorage.getItem("weenbuilder:view") === "moves") prevView = "moves"; } catch {}
+function setView(v) {
+  prevView = v; try { localStorage.setItem("weenbuilder:view", v); } catch {}
+  for (const b of document.querySelectorAll("#prevTabs button")) { const on = b.dataset.view === v; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); }
+  preview();
+}
 function preview() {
-  const c = $("prev"), g = c.getContext("2d"), W = c.width, H = c.height;
+  const c = $("prev"), g = c.getContext("2d"), W = c.width, H = c.height, moves = prevView === "moves";
   g.clearRect(0, 0, W, H);
   const draw = [], walls = [];
-  let wn = 0, skipped = 0, later = 0;
+  let wn = 0, skipped = 0;
   for (const it of items) {
-    if (it.kind === "wall") { const P = solid(it.pts, pointsOf(it.pts)); if (P) walls.push({ P, color: hexOk(it.color) ? it.color : WALL }); else skipped++; continue; }
+    if (it.kind === "wall") { const P = solid(it.pts, pointsOf(it.pts)); if (P) walls.push({ P, color: hexOk(it.color) ? it.color : WALL }); else if (!moves) skipped++; continue; }
     const S = it.wall ? solid(it.starts, pointsOf(it.starts)) : pointsOf(it.starts), col = it.useColor && hexOk(it.color) ? it.color : PALETTE[wn % PALETTE.length]; wn++;
     const noMoves = it.moves.mode === "text" && !(it.moves.text || "").trim(), M = noMoves ? [] : pointsOf(it.moves, startRanges(it.starts));
-    if (!S) { skipped++; continue; }
-    if (!M) skipped++;
-    const day = startDay(it); if (day > 0) later++;
-    draw.push({ S, M: M || [], col: it.wall ? (it.useColor && hexOk(it.color) ? it.color : WALLWEEN) : col, wall: it.wall, day });
+    if (moves ? !M : !S) skipped++;
+    draw.push({ name: `Ween ${wn}`, S: S || [], M: M || [], bad: moves ? !M : !S, col: it.wall ? (it.useColor && hexOk(it.color) ? it.color : WALLWEEN) : col, wall: it.wall, day: startDay(it) });
   }
-  const pts = [...walls.flatMap((w) => w.P), ...draw.flatMap((d) => [...d.S, ...(d.S[0] ? d.M.map((m) => [d.S[0][0] + m[0], d.S[0][1] + m[1]]) : [])])].filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  const pts = (moves ? draw.flatMap((d) => d.M) : [...walls.flatMap((w) => w.P), ...draw.flatMap((d) => d.S)]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
   pts.push([0, 0]);
   const x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0])), y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
   // plot area inside margins for the axis numbers
@@ -473,29 +481,51 @@ function preview() {
   // the items, clipped to the plot
   g.save(); g.beginPath(); g.rect(ML, MT, PW, PH); g.clip();
   const sq = Math.max(2, s * 0.9), r = Math.max(2.5, Math.min(7, s * 0.4));
-  for (const w of walls) { g.fillStyle = w.color; for (const p of w.P) g.fillRect(X(p[0]) - sq / 2, Y(p[1]) - sq / 2, sq, sq); }
-  for (const d of draw) {
-    const now = d.day === 0;
-    g.globalAlpha = now ? 1 : 0.5; g.fillStyle = d.col; g.strokeStyle = d.col; g.lineWidth = 1.6;
-    for (const p of d.S) {
-      if (d.wall) {   // a wall ween is a diamond, a plain wall a square
-        const h = Math.max(2.5, sq * 0.62), x = X(p[0]), y = Y(p[1]);
-        g.beginPath(); g.moveTo(x, y - h); g.lineTo(x + h, y); g.lineTo(x, y + h); g.lineTo(x - h, y); g.closePath();
-        if (now) g.fill(); else g.stroke();
+  if (!moves) {
+    for (const w of walls) { g.fillStyle = w.color; for (const p of w.P) g.fillRect(X(p[0]) - sq / 2, Y(p[1]) - sq / 2, sq, sq); }
+    for (const d of draw) {
+      const now = d.day === 0;
+      g.globalAlpha = now ? 1 : 0.5; g.fillStyle = d.col; g.strokeStyle = d.col; g.lineWidth = 1.6;
+      for (const p of d.S) {
+        if (d.wall) {   // a wall ween is a diamond, a plain wall a square
+          const h = Math.max(2.5, sq * 0.62), x = X(p[0]), y = Y(p[1]);
+          g.beginPath(); g.moveTo(x, y - h); g.lineTo(x + h, y); g.lineTo(x, y + h); g.lineTo(x - h, y); g.closePath();
+          if (now) g.fill(); else g.stroke();
+        }
+        else { g.beginPath(); g.arc(X(p[0]), Y(p[1]), r, 0, 6.2832); if (now) g.fill(); else g.stroke(); }
       }
-      else { g.beginPath(); g.arc(X(p[0]), Y(p[1]), r, 0, 6.2832); if (now) g.fill(); else g.stroke(); }
+      if (d.S[0] && !now) { g.globalAlpha = 0.9; g.font = "italic 13px Georgia, serif"; g.textAlign = "left"; g.textBaseline = "bottom"; g.fillText(`day ${d.day}`, X(d.S[0][0]) + r + 3, Y(d.S[0][1]) - r); }
+      g.globalAlpha = 1;
     }
-    if (d.S[0]) {
-      g.setLineDash(now ? [] : [4, 3]); g.lineWidth = 1.5; g.globalAlpha = now ? 0.8 : 0.45;
-      for (const m of d.M) { g.beginPath(); g.moveTo(X(d.S[0][0]), Y(d.S[0][1])); g.lineTo(X(d.S[0][0] + m[0]), Y(d.S[0][1] + m[1])); g.stroke(); }
-      g.setLineDash([]);
-      if (!now) { g.globalAlpha = 0.9; g.font = "italic 13px Georgia, serif"; g.textAlign = "left"; g.textBaseline = "bottom"; g.fillText(`day ${d.day}`, X(d.S[0][0]) + r + 3, Y(d.S[0][1]) - r); }
+  } else {
+    // the dot every move starts from
+    const ox = X(0), oy = Y(0), rr = Math.max(4, Math.min(7, r + 1));
+    g.fillStyle = "#3b3328"; g.beginPath(); g.arc(ox, oy, rr, 0, 6.2832); g.fill();
+    for (const d of draw) {
+      g.strokeStyle = d.col; g.fillStyle = d.col; g.lineWidth = 1.7; g.globalAlpha = 0.85;
+      const seen = new Set();
+      for (const m of d.M) {
+        const key = m[0] + "," + m[1]; if (seen.has(key)) continue; seen.add(key);
+        const x = X(m[0]), y = Y(m[1]), L = Math.hypot(x - ox, y - oy);
+        if (L < 0.5) { g.beginPath(); g.arc(ox, oy, rr + 4, 0, 6.2832); g.stroke(); continue; }   // the move 0,0: a dot that stays put
+        const h = Math.min(9, Math.max(4, L * 0.35)), ux = (x - ox) / L, uy = (y - oy) / L;
+        g.beginPath(); g.moveTo(ox, oy); g.lineTo(x - ux * h * 0.8, y - uy * h * 0.8); g.stroke();
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x - ux * h - uy * h * 0.45, y - uy * h + ux * h * 0.45); g.lineTo(x - ux * h + uy * h * 0.45, y - uy * h - ux * h * 0.45); g.closePath(); g.fill();
+      }
+      g.globalAlpha = 1;
     }
-    g.globalAlpha = 1;
   }
   g.restore();
-  $("prevNote").textContent = "● ween  ◆ wall ween  ■ wall.  Hollow shapes start later (labelled with their day). Lines: one day of moves from the first start."
-    + (skipped ? ` (${skipped} part${skipped === 1 ? "" : "s"} couldn't be drawn here; Peener Sim will say why if something's wrong.)` : "");
+  const many = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  if (!moves) {
+    c.setAttribute("aria-label", "Where each ween starts and where the walls are");
+    $("prevNote").textContent = "● ween  ◆ wall ween  ■ wall.  Hollow shapes start later (labelled with their day)."
+      + (skipped ? ` (${many(skipped, "part")} couldn't be drawn here; Peener Sim will say why if something's wrong.)` : "");
+  } else {
+    c.setAttribute("aria-label", "Each ween's moves, as arrows from 0,0");
+    const per = draw.map((d) => `${d.name}: ${d.bad ? "can't be drawn here" : d.M.length ? many(new Set(d.M.map((m) => m + "")).size, "move") : "no moves"}`);
+    $("prevNote").textContent = "Each ween's moves, drawn from a dot at 0,0: every day, each dot steps along every arrow." + (per.length ? " " + per.join(" · ") + "." : "");
+  }
 }
 // ── events ────────────────────────────────────────────────────────────────────────────────────────
 function setField(it, path, v) { const ks = path.split("."); let o = it; for (let k = 0; k < ks.length - 1; k++) o = o[ks[k]]; o[ks[ks.length - 1]] = v; }
@@ -520,6 +550,8 @@ $("items").addEventListener("click", (e) => {
 });
 // new weens and walls go to the top, and the page scrolls to them
 function addFirst(it) { items.unshift(it); render(); const c = document.querySelector('.card[data-i="0"]'); if (c) { c.scrollIntoView({ block: "nearest", behavior: "smooth" }); c.querySelector("input[type=text]")?.focus({ preventScroll: true }); } }
+$("prevTabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-view]"); if (b && b.dataset.view !== prevView) setView(b.dataset.view); });
+if (prevView === "moves") setView("moves");
 $("addWeen").addEventListener("click", () => addFirst(newWeen(items.filter((x) => x.kind === "ween").length)));
 $("addWall").addEventListener("click", () => addFirst(newWall()));
 $("clearAll").addEventListener("click", () => { items = []; render(); });
