@@ -468,29 +468,31 @@ function hilbNum(gens, k, cap) {
 // Count first (a small pattern settles in milliseconds) and show that at once; then prove it with the
 // exact Hilbert series, which can take seconds when there are many points. Large patterns that the exact
 // route cannot finish fall back to a full count.
+// Counting stops after `limit` ms (5 s) if f(n) hasn't settled; what was counted comes back with reason "time".
 onmessage = (e) => {
-  const { G, r, lead, maxBits, maxDay, q = 1, groups } = e.data;
-  if (groups) { const full = countGroups(groups, r, maxBits, maxDay, q, e.data.walls || []); postMessage({ f: full.f, W: full.W, period: full.period, done: true, reason: full.reason }); return; }
+  const { G, r, lead, maxBits, maxDay, q = 1, groups, limit = Infinity } = e.data;
+  const until = Date.now() + limit;
+  if (groups) { const full = countGroups(groups, r, maxBits, maxDay, q, e.data.walls || [], until); postMessage({ f: full.f, W: full.W, period: full.period, done: true, reason: full.reason }); return; }
   // the exact route takes milliseconds up to 6 points, about a second at 8, and almost never finishes past 8
-  if (q > 1 || G.length > 8) { const full = count(G, r, lead, maxBits, maxDay, Infinity, true, q); postMessage({ f: full.f, done: true, reason: full.reason }); return; }
-  const quick = count(G, r, lead, 2 ** 24, maxDay, Date.now() + 300, false);
+  if (q > 1 || G.length > 8) { const full = count(G, r, lead, maxBits, maxDay, until, true, q); postMessage({ f: full.f, done: true, reason: full.reason }); return; }
+  const quick = count(G, r, lead, 2 ** 24, maxDay, Math.min(until, Date.now() + 300), false);
   if (quick.reason === "stable") postMessage({ f: quick.f, done: true, reason: "stable", provisional: true });
   try {
-    const H = exactSeries([[0, 0], ...G].map((p) => (r === 1 ? [p[0]] : p)), r, lead, { steps: 4e7, maxG: 6000, until: Date.now() + 2500 });
+    const H = exactSeries([[0, 0], ...G].map((p) => (r === 1 ? [p[0]] : p)), r, lead, { steps: 4e7, maxG: 6000, until: Math.min(until, Date.now() + 2500) });
     const n0 = Math.max(0, H.length - 1 - r), N = Math.max(30, n0 + 25);
     const Cb = (m, j) => { if (m < j) return 0; let v = 1; for (let i = 0; i < j; i++) v = v * (m - i) / (i + 1); return v; };
     const f = []; for (let n = 0; n <= N; n++) { let v = 0; for (let j = 0; j < H.length && j <= n; j++) v += H[j] * Cb(n - j + r, r); f.push(v); }
     postMessage({ f, done: true, reason: "exact", size: 0 });
     return;
   } catch (err) { /* too large for the exact route */ }
-  const full = quick.reason === "stable" ? quick : count(G, r, lead, maxBits, maxDay, Infinity, true);
+  const full = quick.reason === "stable" ? quick : count(G, r, lead, maxBits, maxDay, until, true);
   postMessage({ f: full.f, done: true, reason: full.reason, size: full.f[full.f.length - 1] });
 };
 // Union over weens of the points each reaches: a ween starting on day d holds, on day n ≥ d, everything reachable from
 // its starts in at most n − d of its moves, never landing on a wall. One bitmap per ween (a point may be reached by
 // several weens) and one for the union; only whole-number points are counted. W(n) adds up each ween's weight times
 // the number of points it holds, so a point held by two weens of weight 1 counts 2 there.
-function countGroups(groups, r, maxBits, maxDay, q, walls = []) {
+function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity) {
   let sx0 = Infinity, sx1 = -Infinity, sy0 = Infinity, sy1 = -Infinity, mx0 = 0, mx1 = 0, my0 = 0, my1 = 0;
   for (const g of groups) {
     for (const [x, y] of g.starts) { sx0 = Math.min(sx0, x); sx1 = Math.max(sx1, x); sy0 = Math.min(sy0, y); sy1 = Math.max(sy1, y); }
@@ -626,6 +628,7 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = []) {
     }
     if (settled) break;
     if (n >= maxDay) { reason = "days"; break; }
+    if (Date.now() > until) { reason = "time"; break; }
   }
   return { f, W, reason, period };
 }
@@ -880,6 +883,7 @@ const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0]
 const half = (v2) => (v2 % 2 === 0 ? String(v2 / 2) : `${v2}/2`);
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const MAXBITS = 2 ** 31, MAXDAY = 100000;
+const LIMIT = 5000;   // ms: stop counting if f(n) hasn't settled by then
 
 // Formula input: ⟨expr, expr⟩ templates with integer ranges such as t=0..5, expanded over every combination of the ranges.
 // Every value a formula gives is rounded down to a whole number, unless it already is one: write ceil(…) to round up
@@ -2405,8 +2409,10 @@ function factsFast() {
 // ---- numbers
 let worker = null, timer = null, t0 = 0;
 const wurl = URL.createObjectURL(new Blob([$("wsrc").textContent], { type: "text/javascript" }));
+let lastF = null;   // the latest counts a still-running count has sent
 function run() {
   if (worker) { worker.terminate(); worker = null; }
+  clearTimeout(run.guard); lastF = null;
   $("err").hidden = true;
   fastRes = null; bigPts = null;
   let fastSmall = null, fastMs = 0;
@@ -2461,10 +2467,12 @@ function run() {
   facts(geo, null);
   if (geo.r === 0 && !geo.general) { show(geo, [1, 1, 1, 1, 1], "exact"); return; }
   t0 = performance.now();
-  worker = new Worker(wurl);
-  worker.onmessage = (e) => { if (e.data.done) show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, e.data.W); };
-  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life }) => ({ starts, moves, day, weight, wall, ghost, life })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [] });
-  else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY });
+  const w = worker = new Worker(wurl);
+  // the worker stops itself after LIMIT; if a single step runs long, stop it from here and show what it had counted
+  run.guard = setTimeout(() => { if (worker === w) { w.terminate(); worker = null; show(geo, lastF || [], "time"); } }, LIMIT + 1500);
+  worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, e.data.W); };
+  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life }) => ({ starts, moves, day, weight, wall, ghost, life })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
+  else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY, limit: LIMIT });
 }
 // With fractions, f(n) counts the sums that land on whole-number points. It is a polynomial on each residue
 // class of n mod q (a quasi-polynomial): fit each class through f(n), f(n+q), f(n+2q) past the stable day.
@@ -2493,27 +2501,31 @@ let exactW = null;
 function show(geo, f, reason, provisional, W) {
   Loader.mark("formula");
   exactW = geo.weighted && W ? W : null;
-  const ok = reason === "exact" || reason === "stable", an = geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
+  f = f || [];
+  const ok = reason === "exact" || reason === "stable", an = !f.length ? { N: -1, text: null } : geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
   exactF = f; exactAn = ok ? an : null; setDay(cur);
   const allSame = an.text && an.text.every((t) => t === an.text[0]);
   $("poly").innerHTML = mathHTML(!ok ? "f(n) = not settled" : !an.text ? `f(n) = ${poly(an)}` : allSame ? `f(n) = ${an.text[0]}`
     : an.q <= 6 ? an.text.map((t, j) => `f(n) = ${t} when n ≡ ${j} (mod ${an.q})`).join("; ") : `f(n) repeats with period ${an.q}; when n ≡ 0: ${an.text[0]}`);
-  $("stab").textContent = ok ? `Stable from day ${an.n0}` : `Not settled by day ${an.N}`;
+  $("stab").textContent = ok ? `Stable from day ${an.n0}` : reason === "time" ? `Not settled after ${LIMIT / 1000} s, so counting stopped` : `Not settled by day ${an.N}`;
   const ms = performance.now() - t0;
-  $("meth").textContent = `${reason === "exact" ? "Exact" : provisional ? "Counted, proving…" : ok ? `Counted to day ${an.N}` : "Memory limit reached"} · ${ms < 1000 ? ms.toFixed(0) + " ms" : (ms / 1000).toFixed(1) + " s"}`;
-  facts(geo, ok ? an : null);
+  $("meth").textContent = `${reason === "exact" ? "Exact" : provisional ? "Counted, proving…" : ok || (reason === "time" && an.N >= 0) ? `Counted to day ${an.N}` : reason === "time" ? "Stopped" : reason === "days" ? "Day limit reached" : "Memory limit reached"} · ${ms < 1000 ? ms.toFixed(0) + " ms" : (ms / 1000).toFixed(1) + " s"}`;
+  facts(geo, ok ? an : null, !ok && f.length > 0);
+  if (!ok && !f.length) $("facts").innerHTML = `<span class="muted">stopped before any days were counted</span>`;
 }
 // Counts table: one column per day, rows f(n), Δf, Δ²f; the stable day and the current day are marked.
 let tableFor = null;
-function facts(geo, an) {
-  tableFor = an && exactF ? [geo, an] : null;
-  const f0 = an && exactF;
+// raw: no formula (counting stopped before f(n) settled), so show just the days that were counted
+function facts(geo, an, raw) {
+  tableFor = exactF && (an || raw) ? [geo, an, raw] : null;
+  const f0 = exactF && (an || raw) ? exactF : null;
   if (!f0) { $("facts").innerHTML = `<span class="muted">counting…</span>`; return; }
   // as many days as the simulation shows; past the computed counts the stable formula is exact
-  const q = geo.q || 1, N = Math.max(Math.min(f0.length - 1, Math.max(30, an.n0 + 12)), reach ? reach.maxDay : 0);
+  const q = geo.q || 1, shownDays = Math.max(30, reach ? reach.maxDay : 0);
+  const N = an ? Math.max(Math.min(f0.length - 1, Math.max(30, an.n0 + 12)), reach ? reach.maxDay : 0) : Math.min(f0.length - 1, shownDays);
   const fv = []; for (let n = 0; n <= N; n++) fv.push(n < f0.length ? f0[n] : an.p(n));
   const f = fv;
-  const row = (label, val) => `<tr><th>${label}</th>${Array.from({ length: N + 1 }, (_, n) => `<td data-d="${n}"${n === an.n0 ? ' class="st"' : ""}>${val(n)}</td>`).join("")}</tr>`;
+  const row = (label, val) => `<tr><th>${label}</th>${Array.from({ length: N + 1 }, (_, n) => `<td data-d="${n}"${an && n === an.n0 ? ' class="st"' : ""}>${val(n)}</td>`).join("")}</tr>`;
   const d1 = (n) => (n >= q ? (f[n] - f[n - q]).toLocaleString() : ""), d2 = (n) => (n >= 2 * q ? (f[n] - 2 * f[n - q] + f[n - 2 * q]).toLocaleString() : "");
   const wrow = exactW ? row("weight", (n) => (n < exactW.length ? (+exactW[n].toFixed(6)).toLocaleString() : "")) : "";
   $("facts").innerHTML = `<table id="counts">${row("day n", (n) => n)}${row("f(n)", (n) => f[n].toLocaleString())}${wrow}${row(q > 1 ? `Δ<sub>${q}</sub>f` : "Δf", d1)}${row(q > 1 ? `Δ²<sub>${q}</sub>f` : "Δ²f", d2)}</table>`;
