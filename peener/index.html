@@ -204,16 +204,17 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>&lt;t, t/2&gt; t=0..5</code> a formula's values are rounded down to whole numbers (2.5 → 2, −2.5 → −3); write <code>ceil(t/2)</code> to round up or <code>round(t/2)</code> for the nearest</li>
     <li><code>{[0,1] [0,2] : [1,1] [1,2]}</code> a ween: start at [0,1] and [0,2], move only by [1,1] and [1,2]; several weens combine</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; day 5 ; color blue ; weight 2}</code> a ween that starts on day 5, drawn blue, weighing 2</li>
-    <li><code>{[0,0] : [1,0] [0,1] ; weight 4 ; sum}</code> summed weights: the starting dot weighs 4, and every other dot weighs the sum of the dots that grew into it on the day it appeared, so (1,0) and (0,1) weigh 4 and (1,1) weighs 8 — Pascal's triangle, times 4</li>
+    <li><code>{[0,0] : [1,0] [0,1] ; weight 4 ; sum}</code> summed weights: the starting dot weighs 4, and every other dot weighs the sum of the dots that grew into it on the day it appeared, so (1,0) and (0,1) weigh 4 and (1,1) weighs 8 — Pascal's triangle, times 4. Your own rule: <code>; combine sum + 1</code>, <code>; combine product</code>, <code>; combine most</code>, from sum, product, count, most and least of the incoming weights</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; weight n}</code> a weight can be a formula in n, the day: on day n each of its dots weighs n (also <code>2n+1</code>, <code>n^2/2</code>, <code>log n</code>, <code>1/(n+1)</code>; not rounded; days it isn't defined, like log n on day 0, show "—"); W(n), the total weight, gets its own formula under f(n)</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan n+1}</code> a lifespan can be a formula in n too: a dot that appears on day n lasts n+1 days (rounded down, at least 1)</li>
     <li><code>{[0,10] : [1,0] [-1,0] ; wall}</code> a wall ween: no other ween, wall weens included, can land on or cross its dots; this one grows sideways</li>
     <li class="exh">How a ween is written</li>
-    <li><code>{</code> starts <code>:</code> moves <code>;</code> options <code>}</code>: the colon splits where it starts from how it moves; each <code>;</code> adds an option (day, color, weight, wall, ignores walls, lifespan); no colon means no moves</li>
+    <li><code>{</code> starts <code>:</code> moves <code>;</code> options <code>}</code>: the colon splits where it starts from how it moves; each <code>;</code> adds an option (day, color, weight, sum, wall, ignores walls, lifespan); with no colon the points are both the starting dots and the moves, and <code>; no moves</code> keeps the dots still</li>
+    <li><code>{&lt;t,t&gt; t=0..5 : &lt;t,0&gt; ; weight t ; sum}</code> the moves can use the starting dots' t without a range of their own; defining t again in the moves is an error, since then the options couldn't tell which t they mean. In the options t is each starting dot and n is the day</li>
     <li><code>wall{&lt;t, 12&gt; t=-40..40 ; color #555}</code> a plain wall: it blocks weens but never grows and isn't counted; a one-variable formula is drawn as a solid line, so <code>wall{&lt;t, 3t&gt; t=-9..9}</code> has no gaps</li>
     <li><code>{[0,0] : [1,0] [0,1] ; ignores walls}</code> a ween that passes through every wall</li>
     <li><code>{&lt;t, 0&gt; t=0..20 : [0,1] ; lifespan t+1 ; color hsl(18t, 80%, 50%)}</code> a ween written with its own variable uses it in every option: each starting dot t, and everything it grows into, gets its own lifespan, weight and colour (a dot belongs to the starting dot that reaches it first; on a tie, the earlier one). Such a ween has no n; without its own variable, n is the day</li>
-    <li><code>{&lt;3k, 0&gt; k=1.. ; day 3k}</code> dots that keep appearing: one at (3k, 0) on day 3k for every k, forever (<code>k=1..</code> has no end; the day is a formula in k). Add moves to make each one grow: <code>{&lt;3k, 0&gt; k=1.. : [0,1] [0,-1] ; day 3k}</code></li>
+    <li><code>{&lt;3k, 0&gt; k=1.. ; day 3k ; no moves}</code> dots that keep appearing: one at (3k, 0) on day 3k for every k, forever (<code>k=1..</code> has no end; the day is a formula in k). Add moves to make each one grow: <code>{&lt;3k, 0&gt; k=1.. : [0,1] [0,-1] ; day 3k}</code></li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10}</code> each dot of this ween vanishes 10 days after it appears, so it spreads as a band 10 days thick; it never grows back where it has been, and a wall ween's dots stop blocking once they vanish</li>
     <li class="exh">Weight and walls</li>
     <li>a cell's weight is the total weight of the weens that have reached it</li>
@@ -238,11 +239,12 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><button type="button" class="ex">{[-25,0] : [1,0] [0,1] [-1,-1] ; lifespan 8} {[25,0] : [1,0] [0,1] [-1,-1] ; color blue}</button> lifespan: each red dot lasts 8 days, so red spreads as a ring; blue keeps all of its dots</li>
     <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 4} {[0,0] : [1,0] [0,1] [-1,-1] ; day 10 ; lifespan 4 ; color blue} {[0,0] : [1,0] [0,1] [-1,-1] ; day 20 ; lifespan 4 ; color gold}</button> ripples: three weens 10 days apart, each dot lasting 4 days</li>
     <li><button type="button" class="ex">{[0,12] : [1,0] [-1,0] ; wall ; lifespan 6 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a wall ween whose dots last 6 days: a gap opens in its middle and the ween gets through</li>
-    <li><button type="button" class="ex">wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {&lt;t, 12&gt; t=-12..12 ; wall ; lifespan 15 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a box whose lid (a wall ween) vanishes on day 15, letting the ween out</li>
+    <li><button type="button" class="ex">wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {&lt;t, 12&gt; t=-12..12 ; wall ; lifespan 15 ; color #56607a ; no moves} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a box whose lid (a wall ween) vanishes on day 15, letting the ween out</li>
     <li><button type="button" class="ex">{&lt;t, 0&gt; t=-15..15 : [0,1] [0,-1] ; lifespan 2abs(t)+1 ; color hsl(12t, 80%, 50%)}</button> a rainbow of lines, each starting dot with its own colour and lifespan</li>
-    <li><button type="button" class="ex">{&lt;3k, 0&gt; k=1.. ; day 3k}</button> a new dot every 3 days, forever: f(n) = ⌊n/3⌋</li>
+    <li><button type="button" class="ex">{&lt;3k, 0&gt; k=1.. ; day 3k ; no moves}</button> a new dot every 3 days, forever: f(n) = ⌊n/3⌋</li>
     <li><button type="button" class="ex">{&lt;3k, 0&gt; k=1.. : [0,1] [0,-1] ; day 3k}</button> a comb: every 3 days a new line starts growing up and down</li>
     <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] ; weight 4 ; sum}</button> summed weights: Pascal's triangle (zoom in to read the weights)</li>
+    <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] ; combine sum + 1}</button> your own rule: each dot weighs the sum coming in, plus 1</li>
     <li><button type="button" class="ex">0 1 5</button> a line</li>
     <li><button type="button" class="ex">&lt;t, t^2&gt; t=-3..3</button> a parabola</li>
   </ul></details>
@@ -526,6 +528,8 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
   // summed weights (sumW): a starting dot weighs the ween's weight; every other dot weighs the sum of the weights of the
   // dots that grew into it on the day it appeared. dw holds each dot's weight.
   const dw = groups.map((g) => (g.sumW ? new Map() : null));
+  // the rule that turns the incoming weights into the new dot's (sum unless the ween says otherwise, like sum + 1 or product)
+  const combineW = (b, c) => { const r = groups[b].combine; if (!r) return c[0]; try { return evalExpr(r, { sum: c[0], product: c[1], count: c[2], most: c[3], least: c[4] }); } catch { return NaN; } };
   const maxDeath = Math.max(0, ...groups.map((g, b) => (mortal[b] ? day[b] + lifeAt(b, day[b], 0) : 0)));
   // bitmaps: one per ween (every point it has reached), the union of living dots, then one per ween for its vanished dots
   const GONE = NG + 1, NMAP = NG + 1 + (anyMortal ? NG : 0);
@@ -628,6 +632,7 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     if (day[b] >= n) return;
     const ghost = !!groups[b].ghost, fr = fronts[b], nx = [], mv = groups[b].moves, guard = !ghost && wallIdx.some((k) => k !== b);
     const D = dw[b], sw = D ? null : groups[b].swt, at = bySrc[b] || D ? new Map() : null;   // where each of today's dots sits in nx
+    const acc = D ? new Map() : null;   // today's new dots: the weights coming in (sum, product, count, most, least) and whether whole
     for (let i = 0; i < fr.length; i += 4) {
       const src = fr[i + 3], pw = D ? D.get(fr[i] + "," + fr[i + 1]) : 0;   // this source's weight, passed on (summed weights)
       for (let gi = 0; gi < mv.length; gi++) {
@@ -636,15 +641,16 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
         if (guard && crossesWall(b, gi, fr[i], fr[i + 1])) { addPending(b, fr[i], fr[i + 1], fr[i + 2], src); continue; }
         const x = fr[i] + gx, y = fr[i + 1] + gy, whole = x % q === 0 && y % q === 0, key = x + "," + y;
         if (mark(b, x, y)) {
-          if (at) at.set(key, nx.length); nx.push(x, y, n, src); if (D) D.set(key, pw);
-          if (whole) { held[b]++; if (sw) wsum[b] += sw[src]; if (D) wsum[b] += pw; if (mark(U, x, y)) cnt++; }
+          if (at) at.set(key, nx.length); nx.push(x, y, n, src); if (acc) acc.set(key, [pw, pw, 1, pw, pw, whole]);
+          if (whole) { held[b]++; if (sw) wsum[b] += sw[src]; if (mark(U, x, y)) cnt++; }
         } else if (at) {   // reached again on the day it appeared
           const a = at.get(key); if (a === undefined) continue;
-          if (D) { D.set(key, D.get(key) + pw); if (whole) wsum[b] += pw; }   // its weight adds this source's too
+          if (acc) { const c = acc.get(key); c[0] += pw; c[1] *= pw; c[2]++; if (pw > c[3]) c[3] = pw; if (pw < c[4]) c[4] = pw; }   // this source's weight comes in too
           if (bySrc[b] && src < nx[a + 3]) { if (sw && whole) wsum[b] += sw[src] - sw[nx[a + 3]]; nx[a + 3] = src; }   // a tie: the earlier starting dot
         }
       }
     }
+    if (acc) for (const [key, c] of acc) { const w = combineW(b, c); D.set(key, w); if (c[5]) wsum[b] += w; }   // the day's new weights
     fronts[b] = nx;
   };
   const totalW = () => { let t = 0; for (let b = 0; b < NG; b++) t += groups[b].swt || groups[b].sumW ? wsum[b] : wt[b] * held[b]; return t; };
@@ -845,6 +851,7 @@ onmessage = (e) => {
   // each dot's starting dot (for a ween written with its own variable): first to reach it, ties to the earlier one
   const bySrc = groups.map((g) => !!g.perStart), lifeAt = (b, born, src) => (groups[b].slife ? groups[b].slife[src] : lifeOf[b](born));
   const dwm = groups.map((g) => (g.sumW ? new Map() : null));   // summed weights: each dot's weight (by box index)
+  const combineW = (b, c) => { const r = groups[b].combine; if (!r) return c[0]; try { return evalExpr(r, { sum: c[0], product: c[1], count: c[2], most: c[3], least: c[4] }); } catch { return NaN; } };
   const crossesWall = (b, g, base) => { const p = pathOffs[b][g]; for (let k = 0; k < p.length; k++) { const t = base + p[k]; for (const w of wallIdx) if (w !== b && vis[w][t] === 1) return true; } return false; };
   const isWallCell = new Uint8Array(N * M); for (const c of walls) isWallCell[c] = 1;
   const holders = new Uint8Array(N * M);   // living dots on each painting point
@@ -900,12 +907,13 @@ onmessage = (e) => {
     let next = new Int32Array(Math.max(1024, (fronts[b].length + (R ? R.k.length : 0)) * 2)), nsrc = new Int32Array(next.length), nl = 0;
     const at = bs ? new Map() : null, evAt = bs ? new Map() : null;   // today's dots: place in next and in the event batch
     let pw = 0;   // the current source's weight (summed weights)
-    const add = (k, src) => { V[k] = 1; if (at) at.set(k, nl); nsrc[nl] = src; next[nl++] = k; if (DW) DW.set(k, pw); const e = ev(k, b, src, pw); if (evAt && e >= 0) evAt.set(k, e); };
+    const acc = DW ? new Map() : null;   // today's new dots: the weights coming in, and the place of each in the event batch
+    const add = (k, src) => { V[k] = 1; if (at) at.set(k, nl); nsrc[nl] = src; next[nl++] = k; const e = ev(k, b, src, pw); if (evAt && e >= 0) evAt.set(k, e); if (acc) acc.set(k, [pw, pw, 1, pw, pw, e]); };
     // reached again on the day it appeared: the earlier starting dot wins; a summed weight adds this source's
     const tie = (k, src) => {
       const a = at.get(k); if (a === undefined) return;
       const e = evAt.get(k);
-      if (DW) { DW.set(k, DW.get(k) + pw); if (e !== undefined) wts[e] += pw; }
+      if (acc) { const c = acc.get(k); c[0] += pw; c[1] *= pw; c[2]++; if (pw > c[3]) c[3] = pw; if (pw < c[4]) c[4] = pw; }
       if (bySrc[b] && src < nsrc[a]) { nsrc[a] = src; if (e !== undefined) srcs[e] = src; }
     };
     // sources: yesterday's new dots, then any blocked dots getting another try (ts = the day each appeared, ss = starting dot)
@@ -927,6 +935,7 @@ onmessage = (e) => {
       }
     };
     run(fronts[b], null, fsrc[b]); if (R) run(R.k, R.t, R.s);
+    if (acc) for (const [k, c] of acc) { const w = combineW(b, c); DW.set(k, w); if (c[5] >= 0) wts[c[5]] = w; }   // the day's new weights
     fronts[b] = next.subarray(0, nl); fsrc[b] = nsrc.subarray(0, nl);
     if (mortal[b] && nl && !groups[b].slife) today[b].push(fronts[b]);
   };
@@ -1065,10 +1074,29 @@ function toFrac(v, what) {
   throw new Error(`${what} = ${+v.toFixed(6)} is not a simple fraction; wrap it in round(…).`);
 }
 
-function parse(text) {
+// the finite ranges a text gives its variables, like t=0..5 → { t: [0, 1, …, 5] }
+function rangesOf(text) {
+  const out = {};
+  text.replace(/[−–—]/g, "-").replace(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*(-?\d+)\s*(?:\.\.|\bto\b|:|,)\s*(-?\d+)\s*\]?(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g, (_, v, a, b, st) => {
+    a = Number(a); b = Number(b); const step = Math.max(1, Number(st || 1));
+    if (b >= a && (b - a) / step <= 5000) { out[v] = []; for (let x = a; x <= b; x += step) out[v].push(x); }
+    return " ";
+  });
+  return out;
+}
+// a combine rule: how the weights coming into a new dot make its weight, from sum, product, count, most, least
+function combineRule(txt) {
+  const src = txt.trim(), names = ["sum", "product", "count", "most", "least"];
+  const bad = (src.match(/[a-zA-Z_]\w*/g) || []).find((v) => !names.includes(v) && !FUNCS.includes(v) && v !== "pi" && v !== "e");
+  if (bad) throw new Error(`A combine rule can use sum, product, count, most and least (the weights coming into a dot); "${bad}" isn't one of them.`);
+  let v; try { v = evalExpr(src, { sum: 5, product: 6, count: 2, most: 3, least: 2 }); } catch (e) { throw new Error(`The combine rule "${src}" can't be worked out: ${e.message}`); }
+  if (!Number.isFinite(v)) throw new Error(`The combine rule "${src}" doesn't give a number.`);
+  return src === "sum" ? null : src;
+}
+function parse(text, inherited = null) {
   text = text.replace(/[−–—]/g, "-").replace(/[⟨〈]/g, "<").replace(/[⟩〉]/g, ">").replace(/∈/g, " in ").replace(/…/g, "..");
   if (!/[<>]/.test(text)) return parsePlain(text);
-  const ranges = {};
+  const ranges = { ...(inherited || {}) };   // ranges given elsewhere (a ween's starting dots, for its moves)
   text = text.replace(/\b(?!(?:from|in|to|step|by)\b)([a-zA-Z_]\w*)\s+(?=-?\d+\s*(?:\.\.|\bto\b)\s*-?\d+)/g, "$1=");
   text = text.replace(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*(-?\d+)\s*(?:\.\.|\bto\b|:|,)\s*(-?\d+)\s*\]?(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g, (_, v, a, b, st) => {
     a = Number(a); b = Number(b); const step = Number(st || 1);
@@ -1227,6 +1255,9 @@ function parseInput(text) {
     whole.split(/[;|]/).forEach((part, i) => {
       if (i && /^\s*wall\s*$/i.test(part)) { opt.wall = true; return; }
       if (i && /^\s*(?:sum|summed|sum weights?|add(?:s)? up(?: weights?)?)\s*$/i.test(part)) { opt.sumW = true; return; }   // summed weights
+      const cm = i ? /^\s*(?:combine|rule)\s*[:=]?\s*(.+?)\s*$/i.exec(part) : null;
+      if (cm) { opt.sumW = true; opt.combine = combineRule(cm[1]); return; }   // its own rule, like sum + 1 or product
+      if (i && /^\s*(?:no moves?|still|stays?)\s*$/i.test(part)) { opt.still = true; return; }   // starting dots that don't move
       if (i && /^\s*(ignores?\s+walls?|through\s+walls?|ghost)\s*$/i.test(part)) { opt.ghost = true; return; }
       const lm = i ? /^\s*(?:lifespan|life|lives)\s*[:=]?\s*(.+?)\s*(?:days?)?\s*$/i.exec(part) : null;
       if (lm) { raw.life = lm[1].trim(); return; }
@@ -1241,25 +1272,40 @@ function parseInput(text) {
       } else if (key === "weight") raw.weight = val.trim();
       else raw.color = val.trim();
     });
-    // starts : moves; with no colon the ween has no moves (it stays as it starts)
+    // starts : moves. With no colon the points are both the starting dots and the moves; "; no moves" keeps them still
     const k = body.indexOf(":");
-    const L = (k < 0 ? body : body.slice(0, k)).trim(), R = k < 0 ? "" : body.slice(k + 1).trim();
+    const L = (k < 0 ? body : body.slice(0, k)).trim(), sameAsStarts = k < 0 && !opt.still;
+    let R = k < 0 ? (opt.still ? "" : L) : body.slice(k + 1).trim();
     if (!L) throw new Error("A group needs at least one starting point before the colon.");
+    if (k >= 0 && opt.still && R) throw new Error("\"no moves\" but there are moves after the colon; drop one of them.");
+    if (sameAsStarts && OPEN_RANGE.test(L)) throw new Error("Starting dots that go on forever can't also be the moves. Add ; no moves to keep them still, or give moves after a colon, like {<3k, 0> k=1.. : [0,1] ; day 3k}.");
     if (OPEN_RANGE.test(R)) throw new Error("Only a ween's starting dots can go on forever (k=1..); its moves need an end, like k=1..5.");
     // A ween whose starting dots are written with a variable (t in <t^3, 0> t=-10..10) has that variable everywhere: its
-    // lifespan, weight and colour may use it, and then each starting dot (and all it grows into) gets its own. Such a
-    // ween has no n. A ween without a variable may use n, the day, in its lifespan and weight.
-    const own = [...new Set([...L.matchAll(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*-?\d/g)].map((m) => m[1]))];
+    // moves may use it without a range of their own (and may not give it a second one), and its lifespan, weight and
+    // colour may use it, so each starting dot (and all it grows into) gets its own. n is always the day; an option uses
+    // one or the other.
+    const declared = (txt) => [...new Set([...txt.matchAll(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*-?\d/g)].map((m) => m[1]))];
+    const own = declared(L);
+    if (!sameAsStarts && R) {
+      const twice = declared(R).find((v) => own.includes(v));
+      if (twice) throw new Error(`${twice} is defined twice, in the starting dots and in the moves, so it's unclear which one the options mean. The moves can use the starting dots' ${twice} without a range, like <${twice}, 0>; for a separate range give the moves another letter, like k=0..5.`);
+      const open = (L.match(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*-?\d+\s*\.\.(?!\s*-?\d)/) || [])[1];
+      if (open && new RegExp(`\\b${open}\\b`).test(R.replace(/(\d)([a-z])/gi, "$1 $2"))) throw new Error(`The moves can't use ${open}: it goes on forever. Give the moves a range of their own, like j=0..5.`);
+    }
     const namesIn = (t) => [...new Set((t.replace(/\b(?:hsla?|rgba?)\s*\(/gi, "(").match(/[a-zA-Z_]\w*/g) || []).filter((v) => !FUNCS.includes(v) && v !== "pi" && !(v === "e" && !own.includes("e"))))];
     const perDot = {};
     for (const [what, txt] of [["lifespan", raw.life], ["weight", raw.weight], ["colour", raw.color]]) {
       if (txt == null) continue;
       const names = what === "colour" && !/^\s*(?:hsla?|rgba?)\s*\(/i.test(txt) ? [] : namesIn(txt);
       if (own.length && names.length) {
-        const bad = names.find((v) => !own.includes(v));
-        if (bad) throw new Error(bad === "n" ? `This ween's starting dots use ${own.join(", ")}, so write its ${what} in ${own[0]} too: n isn't defined here.` : `"${bad}" isn't defined in this ween; its starting dots use ${own.join(", ")}.`);
-        perDot[what] = txt;   // one value per starting dot
-      } else if (what === "lifespan") {
+        const bad = names.find((v) => !own.includes(v) && v !== "n");
+        if (bad) throw new Error(`"${bad}" isn't defined in this ween: its starting dots use ${own.join(", ")}, and n is the day.`);
+        const mine = names.some((v) => own.includes(v)), byDay = names.includes("n");
+        if (mine && byDay) throw new Error(`The ${what} uses both ${own[0]} (each starting dot) and n (the day); one option can use only one of them.`);
+        if (mine) { perDot[what] = txt; continue; }   // one value per starting dot
+        if (what === "colour") throw new Error(`A colour can't change with the day n; use the starting dots' ${own[0]}, like hsl(30${own[0]}, 80%, 50%).`);
+      }
+      if (what === "lifespan") {
         const L0 = Number(txt), v = Number.isFinite(L0) ? L0 : dayFormula(txt, "lifespan");
         if (typeof v === "number") {
           if (!Number.isInteger(v) || v < 1 || v > 100000) throw new Error(`A ween's lifespan must be a whole number of days from 1 to 100000, or a formula; got "${txt}".`);
@@ -1272,7 +1318,7 @@ function parseInput(text) {
         opt.color = txt; opt.rgb = rgb;
       }
     }
-    if (opt.dayExpr && own.length) { const bad = namesIn(opt.dayExpr).find((v) => !own.includes(v)); if (bad) throw new Error(bad === "n" ? `This ween's starting dots use ${own.join(", ")}, so write its day in ${own[0]}: n isn't defined here.` : `"${bad}" isn't defined in this ween; its starting dots use ${own.join(", ")}.`); }
+    if (opt.dayExpr && own.length) { const bad = namesIn(opt.dayExpr).find((v) => !own.includes(v)); if (bad) throw new Error(bad === "n" ? `A starting dot's day can't depend on the day n; write it in ${own[0]}, like day 3${own[0]}.` : `"${bad}" isn't defined in this ween; its starting dots use ${own.join(", ")}.`); }
     if (opt.sumW && opt.wexpr) throw new Error("With sum, each starting dot weighs the ween's weight and the rest add up from there, so the weight can't change with the day n; give a number (or a formula in the ween's own variable).");
     let st;
     if (opt.dayExpr || OPEN_RANGE.test(L) || Object.keys(perDot).length) {   // starting dots each with their own day, lifespan, weight or colour
@@ -1288,7 +1334,8 @@ function parseInput(text) {
       st = parse(L); setDim(st.dim);
       if (opt.wall && st.dim === 2 && oneVarFormula(L)) st.pts = joinLine(st.pts);   // a wall ween drawn as a curve is joined up too
     }
-    let mv = { pts: [] }; if (R) { mv = parse(R); setDim(mv.dim); }
+    // the moves: the starting dots' own points (no colon), or their own formula, which may use the starting dots' ranges
+    let mv = { pts: [] }; if (R) { mv = parse(R, sameAsStarts ? null : rangesOf(L)); setDim(mv.dim); }
     groups.push({ starts: st.pts, moves: mv.pts, ...opt });
     return " ";
   });
@@ -1320,7 +1367,7 @@ function weightOn(g, n) {
 }
 let wMemo = { G: null, d: -1, w: null };
 function weightsOn(G, d) { if (wMemo.G !== G || wMemo.d !== d) wMemo = { G, d, w: G.map((g) => weightOn(g, d)) }; return wMemo.w; }
-const wText = (g) => (g.wtSrc ? g.wtSrc : g.wexpr ? g.wexpr.replace(/\s+/g, " ") : String(+g.weight.toFixed(6))) + (g.sumW ? ", summed" : "");
+const wText = (g) => (g.wtSrc ? g.wtSrc : g.wexpr ? g.wexpr.replace(/\s+/g, " ") : String(+g.weight.toFixed(6))) + (g.sumW ? (g.combine ? `, combined by ${g.combine}` : ", summed") : "");
 // A wall drawn by a one-variable formula, like <t, 2t> t=-20..20, is joined up: each point is linked to the
 // next by a straight run of dots (Bresenham), so a steep curve has no gaps for growth to slip through.
 const oneVarFormula = (txt) => /</.test(txt) && (txt.match(/\.\.|\bto\b/g) || []).length === 1;
@@ -1727,7 +1774,7 @@ function startReach() {
   };
   const GR = geoNow.general ? geoNow.groups : [{ starts: [[0, 0]], moves: geoNow.pts.filter((p) => p[0] || p[1]), day: 0, weight: 1, rgb: PALETTE[0], plain: true }];
   forGroups = GR; forSimple = GR.length === 1 && GR[0].plain;
-  gworker.postMessage({ groups: GR.map(({ starts, sdays, spawnOpen, moves, day, wall, ghost, life, lifeExpr, slife, perStart, weight, swt, sumW }) => ({ starts, sdays, spawnOpen, moves, day, wall, ghost, life, lifeExpr, slife, perStart, weight, swt, sumW })), N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q, walls: wallCells(pic) });
+  gworker.postMessage({ groups: GR.map(({ starts, sdays, spawnOpen, moves, day, wall, ghost, life, lifeExpr, slife, perStart, weight, swt, sumW, combine }) => ({ starts, sdays, spawnOpen, moves, day, wall, ghost, life, lifeExpr, slife, perStart, weight, swt, sumW, combine })), N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q, walls: wallCells(pic) });
 }
 const REDS = [[224, 53, 43], [240, 74, 53], [201, 42, 34], [255, 95, 69]], JIT = [1, 1.07, 0.9, 1.14];
 let forGroups = null, forSimple = true;
@@ -2740,7 +2787,7 @@ function run() {
       const scaleDays = (P, D) => { const mp = new Map(); P.forEach((p, i) => { const sp = p.map((v) => Math.round(v * q)), key = sp + ""; if (!mp.has(key)) mp.set(key, [sp, D[i]]); }); const v = [...mp.values()]; return [v.map((e) => e[0]), v.map((e) => e[1])]; };
       const G = groups.map((g, k) => ({ ...(g.sdays ? (([S, D]) => ({ starts: S, sdays: D }))(scaleDays(g.starts, g.sdays)) : { starts: scale(g.starts), sdays: null }),
         spawnOpen: !!g.spawnOpen, dayExpr: g.dayExpr || null, horizon: g.horizon,
-        slife: g.slife || null, swt: g.swt || null, srgb: g.srgb || null, sumW: !!g.sumW, svals: g.svals || null, perStart: !!g.perStart, lifeSrc: g.lifeSrc || null, wtSrc: g.wtSrc || null, colorSrc: g.colorSrc || null,
+        slife: g.slife || null, swt: g.swt || null, srgb: g.srgb || null, sumW: !!g.sumW, combine: g.combine || null, svals: g.svals || null, perStart: !!g.perStart, lifeSrc: g.lifeSrc || null, wtSrc: g.wtSrc || null, colorSrc: g.colorSrc || null,
         moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight, wexpr: g.wexpr || null,
         rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, lifeExpr: g.lifeExpr || null, plain: !g.wall && !g.ghost && !g.life && !g.lifeExpr && !g.color && !g.wexpr && !g.sdays && !g.perStart && !g.sumW && (g.weight == null || g.weight === 1) }));
       // dots that keep appearing add to the growth: count with room for two more degrees, and fit whatever degree it is
@@ -2765,7 +2812,7 @@ function run() {
   // a weight formula: W(n) = sum over weens of w(n) times the dots that ween holds on day n
   const weigh = (W, H) => (H ? H[0].map((_, n) => geo.groups.reduce((s, g, b) => s + weightOn(g, n) * H[b][n], 0)) : W);
   worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, weigh(e.data.W, e.data.H), e.data.H); };
-  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, sdays, spawnOpen, moves, day, weight, wall, ghost, life, lifeExpr, wexpr, slife, swt, sumW }) => ({ starts, sdays, spawnOpen, moves, day, weight, wall, ghost, life, lifeExpr, vary: !!wexpr, slife, swt, sumW })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: geo.spawn ? geo.horizon : MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
+  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, sdays, spawnOpen, moves, day, weight, wall, ghost, life, lifeExpr, wexpr, slife, swt, sumW, combine }) => ({ starts, sdays, spawnOpen, moves, day, weight, wall, ghost, life, lifeExpr, vary: !!wexpr, slife, swt, sumW, combine })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: geo.spawn ? geo.horizon : MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
   else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY, limit: LIMIT });
 }
 // With fractions, f(n) counts the sums that land on whole-number points. It is a polynomial on each residue
