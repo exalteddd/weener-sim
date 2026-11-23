@@ -109,6 +109,8 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
           <option value="box">A ween boxed in by walls</option>
           <option value="grow">A wall ween that grows</option>
           <option value="ghost">A ween that ignores walls</option>
+          <option value="relay">Lifespan: a relay of weens</option>
+          <option value="lid">Lifespan: a box whose lid vanishes</option>
         </select>
         <button type="button" id="clearAll" style="margin-left:auto">Clear all</button>
       </div>
@@ -406,6 +408,10 @@ $("preset").addEventListener("change", () => {
   else if (v === "box") items = [newWall({ pts: FN("t", "12", -12, 12) }), newWall({ pts: FN("t", "-12", -12, 12) }), newWall({ pts: FN("12", "t", -12, 12) }), newWall({ pts: FN("-12", "t", -12, 12) }), newWeen(0)];
   else if (v === "grow") items = [newWeen(0, { starts: P("0,10"), moves: P("1,0 -1,0"), wall: true, useColor: false, color: WALLWEEN }), newWeen(1)];
   else if (v === "ghost") items = [newWall({ pts: FN("t", "6", -15, 15) }), newWeen(0), newWeen(1, { starts: P("3,0"), blocked: false })];
+  else if (v === "relay") items = [newWeen(0, { useLife: true, life: 10 }), newWeen(1, { moves: P("1,1 -1,0 0,-1"), useDay: true, day: 10, useLife: true, life: 10 }),
+    newWeen(2, { moves: P("1,0 -1,0 0,1 0,-1"), useDay: true, day: 20 })];
+  else if (v === "lid") items = [newWall({ pts: FN("t", "-12", -12, 12) }), newWall({ pts: FN("12", "t", -12, 12) }), newWall({ pts: FN("-12", "t", -12, 12) }),
+    newWeen(0, { starts: FN("t", "12", -12, 12), moves: P(""), wall: true, color: WALLWEEN, useLife: true, life: 15 }), newWeen(1)];
   if (v) render();
 });
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 1600); }

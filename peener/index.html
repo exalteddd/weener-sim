@@ -223,6 +223,9 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><button type="button" class="ex">{[-25,0] : [1,0] [0,1] [-1,-1] ; color #2f6fd6} {[25,0] : [2,1] [-1,1] [-1,-2] ; day 8 ; color gold ; weight 3}</button> a late, heavy ween</li>
     <li><button type="button" class="ex">wall{&lt;t, 12&gt; t=-12..12} wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a ween boxed in by four walls</li>
     <li><button type="button" class="ex">{[0,10] : [1,0] [-1,0] ; wall} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a wall that grows sideways above a ween</li>
+    <li><button type="button" class="ex">{[-20,0] : [1,0] [0,1] [-1,-1] ; lifespan 12} {[20,0] : [1,0] [0,1] [-1,-1] ; color blue}</button> lifespan: the red ween vanishes on day 12, the blue one keeps going</li>
+    <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10} {[0,0] : [1,1] [-1,0] [0,-1] ; day 10 ; lifespan 10 ; color blue} {[0,0] : [1,0] [-1,0] [0,1] [0,-1] ; day 20 ; color gold}</button> a relay: each ween lives 10 days, then the next takes over</li>
+    <li><button type="button" class="ex">wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {&lt;t, 12&gt; t=-12..12 ; wall ; lifespan 15 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a box whose lid (a wall ween) vanishes on day 15, letting the ween out</li>
     <li><button type="button" class="ex">0 1 5</button> a line</li>
     <li><button type="button" class="ex">&lt;t, t^2&gt; t=-3..3</button> a parabola</li>
   </ul></details>
