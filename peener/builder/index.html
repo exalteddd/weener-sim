@@ -72,6 +72,7 @@ input[type=number] { width: 6.5em; }
 input[type=checkbox] { accent-color: var(--red); width: 20px; height: 20px; margin: 0; }
 input[type=color] { width: 42px; height: 32px; padding: 0 2px; border: 1px solid var(--rule); background: #fffdf8; cursor: pointer; }
 .hex { width: 7.5em !important; }
+input[type=text].wt { width: 8em; }
 .err { color: var(--red-deep); font-size: 15px; font-style: italic; }
 .code { font: 14px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
 .empty { color: var(--ink-2); font-style: italic; padding: 20px 4px; }
@@ -206,7 +207,12 @@ function itemText(it) {
   const opts = [];
   if (it.useDay && Number(it.day) > 0) opts.push(`day ${Math.round(Number(it.day))}`);
   if (it.useColor && hexOk(it.color)) opts.push(`color ${it.color}`);
-  if (it.useWeight && Number(it.weight) !== 1 && Number.isFinite(Number(it.weight))) opts.push(`weight ${Number(it.weight)}`);
+  if (it.useWeight) {   // a number, or a formula in n (the day), like 2n+1
+    const w = String(it.weight ?? "").trim(), v = Number(w);
+    if (w !== "" && Number.isFinite(v)) { if (v !== 1) opts.push(`weight ${v}`); }
+    else if (weightOk(w)) opts.push(`weight ${w}`);
+    else return { text: "", err: "Weight: a number, or a formula in n (the day) like 2n+1." };
+  }
   if (it.useLife) { const L = Math.round(Number(it.life)); if (!(L >= 1)) return { text: "", err: "Lifespan: a whole number of days, 1 or more." }; opts.push(`lifespan ${L}`); }
   if (it.wall) opts.push("wall");
   if (!it.blocked) opts.push("ignores walls");
@@ -245,7 +251,7 @@ function render() {
         `<div class="row"><span class="lbl">Options</span><div class="checks">
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="number" data-f="day" min="0" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} aria-label="Start day"></div>
           <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
-          <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="number" data-f="weight" step="any" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} aria-label="Weight"></div>
+          <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="text" class="wt" data-f="weight" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} placeholder="2 or 2n+1" aria-label="Weight" spellcheck="false"><span class="note">a number, or a formula in n (the day)</span></div>
           <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="number" data-f="life" min="1" step="1" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} aria-label="Lifespan in days"><span class="note">days: each dot vanishes that long after it appears</span></div>
           <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: no other ween, wall weens included, can land on or cross its dots</label></div>
           <div class="check"><label><input type="checkbox" data-f="blocked" ${it.blocked ? "checked" : ""}> Blocked by walls</label></div>
@@ -283,12 +289,14 @@ function update() {
 // ── day-0 picture: starts, walls and one day of moves (function mode is evaluated here too) ──────────
 // as in Peener: a formula's values are rounded down to whole numbers unless ceil(…) or round(…) says otherwise
 const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
-function evalFn(src, t) {
+// a weight formula: n is the day (t means the same); checked on a few days
+const weightOk = (w) => { if (!w || !/^[\w\s+\-*/^%().,]*$/.test(w)) return false; try { return [0, 1, 2, 3, 10].every((n) => Number.isFinite(evalFn(w, n, true))); } catch { return false; } };
+function evalFn(src, t, dayVar = false) {
   // tokens first, then the implied multiplications (2t, 2pi t, 8cos(…), 3(t+1), (t)(t), pi t), as Peener reads them
   const raw = src.replace(/\*\*/g, "^").match(/\d+(?:\.\d+)?|[a-z]+|[-+*/^%(),]|\S/gi) || [];
   const toks = [];
   for (const k of raw) {
-    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi");
+    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi" || (dayVar && p === "n"));
     if (val && (/^[a-z]/i.test(k) || k === "(" || (/^\d/.test(k) && !/^\d/.test(p)))) toks.push("*");
     toks.push(k);
   }
@@ -298,7 +306,7 @@ function evalFn(src, t) {
     const k = toks[i++];
     if (k === undefined) throw 0;
     if (/^\d/.test(k)) return Number(k);
-    if (k === "t") return t; if (k === "pi") return Math.PI;
+    if (k === "t" || (dayVar && k === "n")) return t; if (k === "pi") return Math.PI;
     if (k === "(") { const v = expr(); i++; return v; }
     if (k === "-") return -pow(); if (k === "+") return pow();
     if (F[k]) { i++; const a = [expr()]; while (toks[i] === ",") { i++; a.push(expr()); } i++; return F[k](...a); }
@@ -535,7 +543,10 @@ function parsePeener(src) {
       } else if ((k = /^\s*(?:day|start)\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
         const d = Number(k[1]); if (Number.isInteger(d) && d >= 0) { o.useDay = d > 0; o.day = d; } else warn.push(`${name}: a start day must be a whole number, 0 or more; got "${k[1]}".`);
       } else if ((k = /^\s*weight\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
-        const w = Number(k[1]); if (Number.isFinite(w)) { o.useWeight = w !== 1; o.weight = w; } else warn.push(`${name}: a weight must be a number; got "${k[1]}".`);
+        const w = Number(k[1]);
+        if (Number.isFinite(w)) { o.useWeight = w !== 1; o.weight = w; }
+        else if (weightOk(k[1])) { o.useWeight = true; o.weight = k[1]; }   // a formula in n, the day
+        else warn.push(`${name}: a weight must be a number or a formula in n, like 2n+1; got "${k[1]}".`);
       } else if ((k = /^\s*colou?r\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
         const hex = toHex(k[1]); if (hex) { o.useColor = true; o.color = hex; } else warn.push(`${name}: "${k[1]}" is not a colour.`);
       } else warn.push(`${name}: skipped "${p.trim()}".`);

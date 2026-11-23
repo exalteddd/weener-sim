@@ -198,6 +198,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>&lt;t, t/2&gt; t=0..5</code> a formula's values are rounded down to whole numbers (2.5 → 2, −2.5 → −3); write <code>ceil(t/2)</code> to round up or <code>round(t/2)</code> for the nearest</li>
     <li><code>{[0,1] [0,2] : [1,1] [1,2]}</code> a ween: start at [0,1] and [0,2], move only by [1,1] and [1,2]; several weens combine</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; day 5 ; color blue ; weight 2}</code> a ween that starts on day 5, drawn blue, weighing 2</li>
+    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; weight n}</code> a weight can be a formula in n, the day: on day n each of its dots weighs n (also <code>2n+1</code>, <code>n^2/2</code>, <code>1/(n+1)</code>; not rounded)</li>
     <li><code>{[0,10] : [1,0] [-1,0] ; wall}</code> a wall ween: no other ween, wall weens included, can land on or cross its dots; this one grows sideways</li>
     <li class="exh">How a ween is written</li>
     <li><code>{</code> starts <code>:</code> moves <code>;</code> options <code>}</code>: the colon splits where it starts from how it moves; each <code>;</code> adds an option (day, color, weight, wall, ignores walls, lifespan); no colon means no moves</li>
@@ -472,7 +473,7 @@ function hilbNum(gens, k, cap) {
 onmessage = (e) => {
   const { G, r, lead, maxBits, maxDay, q = 1, groups, limit = Infinity } = e.data;
   const until = Date.now() + limit;
-  if (groups) { const full = countGroups(groups, r, maxBits, maxDay, q, e.data.walls || [], until); postMessage({ f: full.f, W: full.W, period: full.period, done: true, reason: full.reason }); return; }
+  if (groups) { const full = countGroups(groups, r, maxBits, maxDay, q, e.data.walls || [], until); postMessage({ f: full.f, W: full.W, H: full.H, period: full.period, done: true, reason: full.reason }); return; }
   // the exact route takes milliseconds up to 6 points, about a second at 8, and almost never finishes past 8
   if (q > 1 || G.length > 8) { const full = count(G, r, lead, maxBits, maxDay, until, true, q); postMessage({ f: full.f, done: true, reason: full.reason }); return; }
   const quick = count(G, r, lead, 2 ** 24, maxDay, Math.min(until, Date.now() + 300), false);
@@ -603,6 +604,8 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
   keepBorn(0);
   live = cnt;
   const f = [live], W = [totalW()];
+  // a weight that is a formula in the day n is worked out on the page, from each ween's dot count per day
+  const Hs = groups.some((g) => g.vary) ? groups.map((g, b) => [held[b]]) : null;
   let s = (r + 1) * q, reason = "stable";
   for (let n = 1; ; n++) {
     if (n > cap) { if (cap >= nMax) { reason = "budget"; break; } grow(Math.min(nMax, Math.max(n, Math.ceil(cap * 1.42)))); }
@@ -620,6 +623,7 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     for (let b = 0; b < NG; b++) if (!isWall[b] && day[b] === n) seed(b);
     keepBorn(n);
     live += cnt; f.push(live); W.push(totalW());
+    if (Hs) for (let b = 0; b < NG; b++) Hs[b].push(held[b]);
     let settled = false;
     for (let p = 1; p <= PER; p++) {
       const st = q * p;
@@ -630,7 +634,7 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     if (n >= maxDay) { reason = "days"; break; }
     if (Date.now() > until) { reason = "time"; break; }
   }
-  return { f, W, reason, period };
+  return { f, W, H: Hs, reason, period };
 }
 function count(G, r, lead, maxBits, maxDay, until, progress, q = 1) {
   let xmin = 0, xmax = 0, ymin = 0, ymax = 0;
@@ -1032,9 +1036,8 @@ function parseInput(text) {
         if (!Number.isInteger(d) || d < 0 || d > 100000) throw new Error(`A ween's day must be a whole number from 0 to 100000; got "${val}".`);
         opt.day = d;
       } else if (key === "weight") {
-        const w = Number(val);
-        if (!Number.isFinite(w)) throw new Error(`A ween's weight must be a number; got "${val}".`);
-        opt.weight = w;
+        const w = parseWeight(val);
+        if (typeof w === "number") opt.weight = w; else opt.wexpr = w.expr;
       } else {
         const rgb = parseColour(val);
         if (!rgb) throw new Error(`"${val}" is not a colour. Try red, gold, #2f6fd6 or rgb(40,120,200).`);
@@ -1058,6 +1061,27 @@ function parseInput(text) {
   return { groups, dim, general, wallGroups };
 }
 
+// A weight is a number (2, -1/2, 2pi) or a formula in n, the day, like 2n+1 or n^2/2 (t means the same as n).
+// On day n every dot of the ween weighs w(n). Weights are not rounded.
+function parseWeight(val) {
+  const src = val.trim();
+  const bad = (src.match(/[a-zA-Z_]\w*/g) || []).find((v) => !["n", "t", "pi", ...FUNCS].includes(v));
+  if (bad) throw new Error(`A ween's weight is a number or a formula in n (the day), like weight 2n+1; "${bad}" isn't n.`);
+  const at = (n) => { let v; try { v = evalExpr(src, { n, t: n }); } catch (e) { throw new Error(`The weight "${src}" can't be worked out on day ${n}: ${e.message}`); }
+    if (!Number.isFinite(v)) throw new Error(`The weight "${src}" isn't a number on day ${n}.`); return v; };
+  const w0 = at(0);
+  if (!/\b[nt]\b/.test(src.replace(/(\d)([nt])\b/g, "$1 $2"))) return w0;   // no n: a plain number
+  for (const n of [1, 2, 3, 10, 100]) at(n);
+  return { expr: src };
+}
+// A ween's weight on day n, and every ween's weights on one day (kept, since each point asks for them)
+function weightOn(g, n) {
+  if (!g.wexpr) return g.weight;
+  try { const v = evalExpr(g.wexpr, { n, t: n }); return Number.isFinite(v) ? v : NaN; } catch { return NaN; }
+}
+let wMemo = { G: null, d: -1, w: null };
+function weightsOn(G, d) { if (wMemo.G !== G || wMemo.d !== d) wMemo = { G, d, w: G.map((g) => weightOn(g, d)) }; return wMemo.w; }
+const wText = (g) => (g.wexpr ? g.wexpr.replace(/\s+/g, " ") : String(+g.weight.toFixed(6)));
 // A wall drawn by a one-variable formula, like <t, 2t> t=-20..20, is joined up: each point is linked to the
 // next by a straight run of dots (Bresenham), so a steep curve has no gaps for growth to slip through.
 const oneVarFormula = (txt) => /</.test(txt) && (txt.match(/\.\.|\bto\b/g) || []).length === 1;
@@ -1466,10 +1490,10 @@ let forGroups = null, forSimple = true;
 // a point's colour on day d: the weight-weighted mix of the colours of the weens that hold it (one plain ween: the reds)
 function cellColour(t, d) {
   if (reach.simple) return reach.dayOf[0][t] <= d ? REDS[t & 3] : null;
-  const G = reach.groups, D = reach.dayOf, X = reach.life;
+  const G = reach.groups, D = reach.dayOf, X = reach.life, Wd = weightsOn(G, d);
   let r = 0, g = 0, b = 0, ws = 0, r0 = 0, g0 = 0, b0 = 0, n = 0;
   for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) {
-    const c = G[k].rgb, w = Math.abs(G[k].weight);
+    const c = G[k].rgb, w = Math.abs(Wd[k]) || 0;
     n++; r0 += c[0]; g0 += c[1]; b0 += c[2]; r += w * c[0]; g += w * c[1]; b += w * c[2]; ws += w;
   }
   if (!n) return null;
@@ -1479,8 +1503,8 @@ function cellColour(t, d) {
 }
 // total weight of a point on day d
 function cellWeight(t, d) {
-  let w = 0, n = 0; const G = reach.groups, D = reach.dayOf, X = reach.life;
-  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) { w += G[k].weight; n++; }
+  let w = 0, n = 0; const G = reach.groups, D = reach.dayOf, X = reach.life, Wd = weightsOn(G, d);
+  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) { w += Wd[k]; n++; }
   return n ? w : null;
 }
 function applyDay(d) {
@@ -1490,8 +1514,15 @@ function applyDay(d) {
   const put = (t) => { const c = cellColour(t, hi); if (c) { px[4 * t] = c[0]; px[4 * t + 1] = c[1]; px[4 * t + 2] = c[2]; } else { px[4 * t] = base[4 * t]; px[4 * t + 1] = base[4 * t + 1]; px[4 * t + 2] = base[4 * t + 2]; } };
   // points change between the two days where a dot appeared, or (lifespan L) where one that appeared L days earlier vanished
   const a = Math.min(hi, was), z = Math.max(hi, was), span = (lo, top) => { lo = Math.max(lo, 0); top = Math.min(top, last); for (let k = offsets[lo]; k < offsets[top + 1]; k++) put(order[k]); };
-  span(a + 1, z);
-  for (const L of new Set(reach.life)) if (Number.isFinite(L) && z - L >= 0) span(a + 1 - L, z - L);
+  // weights that change by day can change how overlapping weens mix: then every point shown is repainted
+  const mixShifts = () => { if (reach.simple || reach.groups.length < 2 || !reach.groups.some((g) => g.wexpr) || was < 0) return false;
+    const A = reach.groups.map((g) => Math.abs(weightOn(g, was)) || 0), B = reach.groups.map((g) => Math.abs(weightOn(g, hi)) || 0), sa = A.reduce((x, y) => x + y, 0), sb = B.reduce((x, y) => x + y, 0);
+    return A.some((v, k) => Math.abs(v * sb - B[k] * sa) > 1e-9 * Math.max(1, sa * sb)); };
+  if (was !== hi && mixShifts()) span(0, z);
+  else {
+    span(a + 1, z);
+    for (const L of new Set(reach.life)) if (Number.isFinite(L) && z - L >= 0) span(a + 1 - L, z - L);
+  }
   shown = d; pic.cg.putImageData(pic.comp, 0, 0);
 }
 // Edge mask for the painting: solid inside, thinning to sparse dots over the outer band.
@@ -1612,7 +1643,7 @@ function legend(geo) {
   const G = geo && geo.general ? geo.groups : null;
   if ((!G || (G.length === 1 && G[0].plain && !G[0].day)) && !textWallGroups.length) { $("legend").innerHTML = ""; $("legendMore").hidden = true; return; }
   if (!G) { $("legend").innerHTML = textWallGroups.map((w) => `<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dots</span>`).join(""); foldLegend(); return; }
-  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${+g.weight.toFixed(6)}</span>`);
+  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${wText(g)}</span>`);
   for (const w of textWallGroups) items.push(`<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dot${w.pts.length === 1 ? "" : "s"}</span>`);
   $("legend").innerHTML = items.join("");
   foldLegend();
@@ -1634,8 +1665,8 @@ function hoverInfo(e) {
   let txt = `(${x}, ${y})`;
   if (isWallAt(x, y)) txt += " · wall";
   else if (reach && reach.dayOf) {
-    const parts = [], G = reach.groups; let w = 0;
-    for (let k = 0; k < G.length; k++) { const dd = reach.dayOf[k][t]; if (dd !== 0x7fffffff) { parts.push(`ween ${k + 1}${G[k].wall ? " (wall)" : ""} day ${dd}${Number.isFinite(reach.life[k]) ? `, gone day ${dd + reach.life[k]}` : ""}`); if (dd <= d && d < dd + reach.life[k]) w += G[k].weight; } }
+    const parts = [], G = reach.groups, Wd = weightsOn(G, d); let w = 0;
+    for (let k = 0; k < G.length; k++) { const dd = reach.dayOf[k][t]; if (dd !== 0x7fffffff) { parts.push(`ween ${k + 1}${G[k].wall ? " (wall)" : ""} day ${dd}${Number.isFinite(reach.life[k]) ? `, gone day ${dd + reach.life[k]}` : ""}`); if (dd <= d && d < dd + reach.life[k]) w += Wd[k]; } }
     txt += parts.length ? ` · weight ${+w.toFixed(6)} on day ${d} · reached by ${parts.join(", ")}` : " · not reached";
   }
   $("unit").textContent = txt;
@@ -2452,11 +2483,11 @@ function run() {
       const o = scale(groups[0].moves).filter((p) => p[0] !== 0 || p[1] !== 0);
       geo = geometry([[0, 0], ...o], dim); geo.q = q;
     } else {
-      const G = groups.map((g, k) => ({ starts: scale(g.starts), moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight,
-        rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, plain: !g.wall && !g.ghost && !g.life && !g.color && (g.weight == null || g.weight === 1) }));
+      const G = groups.map((g, k) => ({ starts: scale(g.starts), moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight, wexpr: g.wexpr || null,
+        rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, plain: !g.wall && !g.ghost && !g.life && !g.color && !g.wexpr && (g.weight == null || g.weight === 1) }));
       const r = Math.max(0, ...G.map((g) => geometry([[0, 0], ...g.moves], dim).r));
       geo = { general: true, groups: G, r, q, k: G.reduce((a, g) => a + g.starts.length + g.moves.length, 0), walled,
-        weighted: G.length > 1 || G.some((g) => g.weight !== 1) };
+        weighted: G.length > 1 || G.some((g) => g.weight !== 1 || g.wexpr) };
     }
     if (q > 1) { const fq = (n) => { const g = gcd(n, q); return g === q ? String(n / q) : `${n / g}/${q / g}`; }; geo.fmt = (p) => (dim === 1 ? fq(p[0]) : `(${fq(p[0])},${fq(p[1])})`); }
   }
@@ -2470,8 +2501,10 @@ function run() {
   const w = worker = new Worker(wurl);
   // the worker stops itself after LIMIT; if a single step runs long, stop it from here and show what it had counted
   run.guard = setTimeout(() => { if (worker === w) { w.terminate(); worker = null; show(geo, lastF || [], "time"); } }, LIMIT + 1500);
-  worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, e.data.W); };
-  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life }) => ({ starts, moves, day, weight, wall, ghost, life })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
+  // a weight formula: W(n) = sum over weens of w(n) times the dots that ween holds on day n
+  const weigh = (W, H) => (H ? H[0].map((_, n) => geo.groups.reduce((s, g, b) => s + weightOn(g, n) * H[b][n], 0)) : W);
+  worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, weigh(e.data.W, e.data.H)); };
+  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life, wexpr }) => ({ starts, moves, day, weight, wall, ghost, life, vary: !!wexpr })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
   else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY, limit: LIMIT });
 }
 // With fractions, f(n) counts the sums that land on whole-number points. It is a polynomial on each residue
@@ -2527,7 +2560,7 @@ function facts(geo, an, raw) {
   const f = fv;
   const row = (label, val) => `<tr><th>${label}</th>${Array.from({ length: N + 1 }, (_, n) => `<td data-d="${n}"${an && n === an.n0 ? ' class="st"' : ""}>${val(n)}</td>`).join("")}</tr>`;
   const d1 = (n) => (n >= q ? (f[n] - f[n - q]).toLocaleString() : ""), d2 = (n) => (n >= 2 * q ? (f[n] - 2 * f[n - q] + f[n - 2 * q]).toLocaleString() : "");
-  const wrow = exactW ? row("weight", (n) => (n < exactW.length ? (+exactW[n].toFixed(6)).toLocaleString() : "")) : "";
+  const wrow = exactW ? row("weight", (n) => (n >= exactW.length ? "" : Number.isFinite(exactW[n]) ? (+exactW[n].toFixed(6)).toLocaleString() : "—")) : "";
   $("facts").innerHTML = `<table id="counts">${row("day n", (n) => n)}${row("f(n)", (n) => f[n].toLocaleString())}${wrow}${row(q > 1 ? `Δ<sub>${q}</sub>f` : "Δf", d1)}${row(q > 1 ? `Δ²<sub>${q}</sub>f` : "Δ²f", d2)}</table>`;
   markDay(cur);
 }
