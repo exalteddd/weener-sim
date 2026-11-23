@@ -165,7 +165,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 // a set of points is { mode: "points" | "fn" | "text", points, fx, fy, from, to, step, text }
 const pointSet = (points, fn) => ({ mode: fn ? "fn" : "points", points: points || "", fx: fn ? fn[0] : "t", fy: fn ? fn[1] : "0", from: fn ? fn[2] : -10, to: fn ? fn[3] : 10, step: 1, text: "" });
 const newWeen = (k, o = {}) => ({ kind: "ween", starts: pointSet("0,0"), moves: pointSet("1,0 0,1 -1,-1"),
-  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, useLife: false, life: 10, sumW: false, combine: "sum", wall: false, blocked: true, ...o });
+  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, useLife: false, life: 10, sat: "", light: "", sumW: false, combine: "sum", wall: false, blocked: true, ...o });
 const newWall = (o = {}) => ({ kind: "wall", pts: pointSet("", ["t", "10", -20, 20]), color: WALL, ...o });
 let items = [];
 try { items = JSON.parse(localStorage.getItem("weenbuilder:v1") || "null") || []; } catch { items = []; }
@@ -196,6 +196,8 @@ function pointsText(ps) {
   return { text: pairs.join(" "), err: "" };
 }
 const hexOk = (h) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(h);
+// a colour scheme Peener reads: rainbow, red to blue, with "by t" or "over N"
+const colourSchemeText = (c) => /^\s*rainbow\b/i.test(String(c || "")) || /\S\s+to\s+\S/i.test(String(c || ""));
 const colourFormula = (c) => { const m = /^\s*(?:hsla?|rgba?)\s*\((.*)\)\s*$/i.exec(String(c || "")); return !!m && /[a-z_]/i.test(m[1]); };   // like hsl(30t, 80%, 50%)
 const OPEN_RANGE = /\b[a-zA-Z_]\w*\s*(?:=|\bin\b|\bfrom\b)\s*-?\d+\s*\.\.(?!\s*-?\d)/;   // k=1.. with no end, as Peener reads it
 function itemText(it) {
@@ -222,7 +224,9 @@ function itemText(it) {
   if (dayNum) opts.push(`day ${Math.round(Number(dayTxt))}`);   // ticked: written even when it is 0
   if (dayFn) opts.push(`day ${dayTxt}`);
   if (it.useColor && hexOk(it.color)) opts.push(`color ${it.color}`);
-  else if (it.useColor && colourFormula(it.color)) opts.push(`color ${it.color.trim()}`);   // a colour per starting dot, like hsl(30t, 80%, 50%)
+  else if (it.useColor && (colourFormula(it.color) || colourSchemeText(it.color))) opts.push(`color ${it.color.trim()}`);   // a formula or a scheme
+  if (it.useColor && it.sat !== "" && it.sat != null && Number.isFinite(Number(it.sat))) opts.push(`saturation ${Number(it.sat)}`);
+  if (it.useColor && it.light !== "" && it.light != null && Number.isFinite(Number(it.light))) opts.push(`lightness ${Number(it.light)}`);
   if (it.useWeight) {   // a number, or a formula in n (the day), like 2n+1
     const w = String(it.weight ?? "").trim(), v = Number(w);
     if (w !== "" && Number.isFinite(v)) { if (v !== 1) opts.push(`weight ${v}`); }
@@ -277,7 +281,8 @@ function render() {
       body = pointsForm("starts", it.starts, "Starts at") + pointsForm("moves", it.moves, "Moves") +
         `<div class="row"><span class="lbl">Options</span><div class="checks">
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="text" class="wt" data-f="day" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} placeholder="0 or 3t" aria-label="Start day" spellcheck="false"><span class="note">a number, or a formula in t: each starting dot appears on its own day</span></div>
-          <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}<span class="note">or a colour for each starting dot: with Starts at as a Function of t, type a formula like <code>hsl(30t, 80%, 50%)</code> in the box</span></div>
+          <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}<span class="note">or type <code>rainbow</code>, <code>red to blue</code>, <code>rainbow over 30</code> (by the day each dot appears), <code>rainbow by t</code> (across the starting dots, with Starts at as a Function of t), or a formula like <code>hsl(30t, 80%, 50%)</code></span></div>
+          <div class="check"><label>Saturation</label><input type="number" data-f="sat" min="0" max="100" value="${esc(it.sat ?? "")}" ${it.useColor ? "" : "disabled"} placeholder="—" aria-label="Saturation percent"><label>Lightness</label><input type="number" data-f="light" min="0" max="100" value="${esc(it.light ?? "")}" ${it.useColor ? "" : "disabled"} placeholder="—" aria-label="Lightness percent"><span class="note">percent, both optional: 40 and 70 give pastels</span></div>
           <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="text" class="wt" data-f="weight" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} placeholder="2 or 2n+1" aria-label="Weight" spellcheck="false"><span class="note">a number, or a formula in n (the day)</span></div>
           <div class="check"><label><input type="checkbox" data-f="sumW" ${it.sumW ? "checked" : ""}> Combine weights from the dots that grew into it, by</label><input type="text" class="wt" data-f="combine" value="${esc(it.combine ?? "sum")}" ${it.sumW ? "" : "disabled"} placeholder="sum" aria-label="Combine rule" spellcheck="false"><span class="note">sum, product, count, most, least, or a formula like sum + 1 (the starting dots weigh the weight above)</span></div>
           <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="text" class="wt" data-f="life" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} placeholder="10 or n+1" aria-label="Lifespan in days" spellcheck="false"><span class="note">days: each dot vanishes that long after it appears (a formula in n: n is the day it appears)</span></div>
@@ -568,6 +573,7 @@ function parsePeener(src) {
       if (/^\s*wall\s*$/i.test(p)) { o.wall = true; return; }
       if (/^\s*(?:sum|summed|sum weights?|add(?:s)? up(?: weights?)?)\s*$/i.test(p)) { o.sumW = true; o.combine = "sum"; return; }
       if (/^\s*(?:no moves?|still|stays?)\s*$/i.test(p)) { o.still = true; return; }
+      { const c = /^\s*(saturation|sat|lightness|light)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*%?\s*$/i.exec(p); if (c) { o[/^sat/i.test(c[1]) ? "sat" : "light"] = Number(c[2]); if (o.useColor === false) { o.useColor = true; } return; } }
       { const c = /^\s*(?:combine|rule)\s*[:=]?\s*(.+?)\s*$/i.exec(p); if (c) { o.sumW = true; o.combine = c[1]; return; } }
       if (/^\s*(ignores?\s+walls?|through\s+walls?|ghost)\s*$/i.test(p)) { o.blocked = false; return; }
       let k;
@@ -589,7 +595,7 @@ function parsePeener(src) {
       } else if ((k = /^\s*colou?r\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
         const hex = toHex(k[1]);
         if (hex) { o.useColor = true; o.color = hex; }
-        else if (colourFormula(k[1])) { o.useColor = true; o.color = k[1].trim(); }   // a colour per starting dot, like hsl(30t, 80%, 50%)
+        else if (colourFormula(k[1]) || colourSchemeText(k[1])) { o.useColor = true; o.color = k[1].trim(); }   // a formula or a scheme (rainbow, red to blue)
         else warn.push(`${name}: "${k[1]}" is not a colour.`);
       } else warn.push(`${name}: skipped "${p.trim()}".`);
     });
