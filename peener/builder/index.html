@@ -64,7 +64,7 @@ input[type=text].wide, textarea.wide { width: 100%; }
 input[type=number] { width: 6.5em; }
 .fn { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-style: italic; }
 .fn input[type=text] { width: 10em; }
-.fn input[type=number] { width: 5.5em; }
+.fn input[type=number], .fn input.to { width: 5.5em; }
 .checks { display: grid; gap: 8px; }
 .check { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 34px; }
 .check > label { display: inline-flex; align-items: center; gap: 10px; font-style: italic; cursor: pointer; min-width: 0; }
@@ -210,8 +210,13 @@ function itemText(it) {
   // the start day: a number, or a formula in the starting dots' variable (each dot then appears on its own day)
   const dayTxt = it.useDay ? String(it.day ?? "").trim() : "", dayNum = dayTxt !== "" && Number.isFinite(Number(dayTxt)), dayFn = !!dayTxt && !dayNum;
   if (dayFn && !/^[\w\s+\-*/^%().,]+$/.test(dayTxt)) return { text: "", err: "Starts on day: a whole number, or a formula in the starting dots' variable like 3t." };
-  if ((s.open || OPEN_RANGE.test(s.text)) && !dayFn) return { text: "", err: "Starting dots that go on forever need a day for each: tick Starts on day and write a formula like 3t." };
-  if (dayNum && Number(dayTxt) > 0) opts.push(`day ${Math.round(Number(dayTxt))}`);
+  if (dayNum && !(Number(dayTxt) >= 0)) return { text: "", err: "Starts on day: days start at 0." };
+  const forever = s.open || OPEN_RANGE.test(s.text);
+  if (forever && !dayFn) return { text: "", err: dayNum
+    ? `Starts on day ${dayTxt} would put endless dots on that one day, since “to” is empty (forever). Give “to” an end, or make the day grow with t, like 3t.`
+    : "Starting dots that go on forever (“to” is empty) need a day for each: tick Starts on day and write a formula like 3t, or give “to” an end." };
+  if (dayFn && it.starts.mode === "points") return { text: "", err: `Starts on day ${dayTxt} is a formula, so each starting dot needs its own t: write the starts as a Function of t, or give a plain day like 3.` };
+  if (dayNum) opts.push(`day ${Math.round(Number(dayTxt))}`);   // ticked: written even when it is 0
   if (dayFn) opts.push(`day ${dayTxt}`);
   if (it.useColor && hexOk(it.color)) opts.push(`color ${it.color}`);
   if (it.useWeight) {   // a number, or a formula in n (the day), like 2n+1
@@ -238,7 +243,7 @@ function pointsForm(key, ps, label) {
   if (ps.mode === "points") body = `<input type="text" class="wide" data-f="${key}.points" value="${esc(ps.points)}" placeholder="0,1 2,-1 …" spellcheck="false">`;
   else if (ps.mode === "fn") body = `<div class="fn">x = <input type="text" data-f="${key}.fx" value="${esc(ps.fx)}" aria-label="x of t" spellcheck="false">
       y = <input type="text" data-f="${key}.fy" value="${esc(ps.fy)}" aria-label="y of t" spellcheck="false"> for t from
-      <input type="number" data-f="${key}.from" value="${esc(ps.from)}" aria-label="t from"> to <input type="number" data-f="${key}.to" value="${esc(ps.to)}" ${key === "starts" ? 'placeholder="∞" title="Leave empty to keep making dots forever"' : ""} aria-label="t to">
+      <input type="number" data-f="${key}.from" value="${esc(ps.from)}" aria-label="t from"> to <input ${key === "starts" ? 'type="text" inputmode="numeric" class="to" placeholder="∞" title="Leave empty to keep making dots forever"' : 'type="number"'} data-f="${key}.to" value="${esc(ps.to)}" aria-label="t to">
       step <input type="number" data-f="${key}.step" value="${esc(ps.step)}" min="1" aria-label="step"></div>
       <div class="note">Values round down to whole numbers; write ceil(…) to round up, round(…) for the nearest.${key === "starts" ? " Leave “to” empty to keep making dots forever, each on its own day: tick Starts on day and write a formula like 3t." : ""}</div>`;
   else body = `<input type="text" class="wide" data-f="${key}.text" value="${esc(ps.text)}" placeholder="anything Peener accepts, e.g. <round(9cos(2pi t/12)), round(9sin(2pi t/12))> t=0..11" spellcheck="false">`;
