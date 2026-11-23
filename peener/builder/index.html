@@ -324,12 +324,12 @@ function update() {
 const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
 // a weight or lifespan formula: n is the day (t means the same); checked on a few days
 const weightOk = (w) => { if (!w || !/^[\w\s+\-*/^%().,]*$/.test(w)) return false; return [0, 1, 2, 3, 10].some((n) => { try { return Number.isFinite(evalFn(w, n, true)); } catch { return false; } }); };
-function evalFn(src, t, dayVar = false) {
+function evalFn(src, t, dayVar = false, env = null) {
   // tokens first, then the implied multiplications (2t, 2pi t, 8cos(…), 3(t+1), (t)(t), pi t), as Peener reads them
   const raw = src.replace(/\*\*/g, "^").match(/\d+(?:\.\d+)?|[a-z][a-z0-9]*|[-+*/^%(),]|\S/gi) || [];
   const toks = [];
   for (const k of raw) {
-    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi" || p === "e" || (dayVar && p === "n"));
+    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi" || p === "e" || (dayVar && p === "n") || (env && Object.hasOwn(env, p)));
     if (val && (/^[a-z]/i.test(k) || k === "(" || (/^\d/.test(k) && !/^\d/.test(p)))) toks.push("·");   // implied ×
     toks.push(k);
   }
@@ -341,6 +341,7 @@ function evalFn(src, t, dayVar = false) {
     const k = toks[i++];
     if (k === undefined) throw 0;
     if (/^\d/.test(k)) return Number(k);
+    if (env && Object.hasOwn(env, k)) return env[k];
     if (k === "t" || (dayVar && k === "n")) return t; if (k === "pi") return Math.PI; if (k === "e") return Math.E;
     if (k === "(") { const v = expr(); i++; return v; }
     if (k === "-") return -pow(); if (k === "+") return pow();
@@ -352,13 +353,64 @@ function evalFn(src, t, dayVar = false) {
   const expr = () => { let v = term(); while (toks[i] === "+" || toks[i] === "-") { const o = toks[i++], w = term(); v = o === "+" ? v + w : v - w; } return v; };
   const v = expr(); if (i !== toks.length) throw 0; return v;
 }
-function pointsOf(ps) {
-  if (ps.mode === "text") return null;
+function pointsOf(ps, inherited = {}) {
+  if (ps.mode === "text") return textPoints(ps.text || "", inherited);
   if (ps.mode === "points") { const out = []; const re = new RegExp(String.raw`(${NUM})\s*,\s*(${NUM})`, "g"); let m; while ((m = re.exec(ps.points))) out.push([eval1(m[1]), eval1(m[2])]); return out; }
   const st = Math.max(1, Number(ps.step) || 1), a = Number(ps.from), out = [], b = String(ps.to ?? "").trim() === "" ? a + 30 * st : Number(ps.to);
   if (!Number.isFinite(a) || !Number.isFinite(b) || (b - a) / st > 4000) return null;
   try { for (let t = a; t <= b; t += st) out.push([down(evalFn(ps.fx, t)), down(evalFn(ps.fy, t))]); } catch { return null; }
   return out;
+}
+// Text, read as Peener reads it: points like (1,0) or [1,0], and formulas <x, y> with ranges (t=-10..10, step 2).
+// A range left open (k=1..) is drawn for its first 30 values. Moves may use the starts' ranges, as in Peener.
+const CALC_FNS = ["round", "floor", "ceil", "sqrt", "cbrt", "exp", "log", "ln", "log2", "log10", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "sign", "abs", "min", "max"];
+const tidy = (text) => text.replace(/[−–—]/g, "-").replace(/[⟨〈]/g, "<").replace(/[⟩〉]/g, ">").replace(/∈/g, " in ").replace(/…/g, "..")
+  .replace(/\b(?!(?:from|in|to|step|by)\b)([a-zA-Z_]\w*)\s+(?=-?\d+\s*(?:\.\.|\bto\b)\s*-?\d+)/g, "$1=");   // "t 0..5" means t=0..5
+const CLOSED = /\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*(-?\d+)\s*(?:\.\.|\bto\b|:|,)\s*(-?\d+)\s*\]?(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g;
+const OPEN = /\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*(-?\d+)\s*\.\.(?!\s*-?\d)(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g;
+// the ranges written in a text, as lists of values (closed ranges only: those are what moves can borrow)
+function textRanges(text) {
+  const out = {};
+  tidy(text).replace(CLOSED, (_, v, a, b, st) => { a = Number(a); b = Number(b); const step = Math.max(1, Number(st || 1));
+    if (b >= a && (b - a) / step <= 4000) { out[v] = []; for (let x = a; x <= b; x += step) out[v].push(x); } return " "; });
+  return out;
+}
+// the ranges a ween's moves can use: its starts', as a Function of t or written in its text
+function startRanges(ps) {
+  if (ps.mode === "text") return textRanges(ps.text || "");
+  if (ps.mode === "fn" && String(ps.to ?? "").trim() !== "") {
+    const a = Number(ps.from), b = Number(ps.to), st = Math.max(1, Number(ps.step) || 1);
+    if (Number.isFinite(a) && Number.isFinite(b) && b >= a && (b - a) / st <= 4000) { const T = []; for (let x = a; x <= b; x += st) T.push(x); return { t: T }; }
+  }
+  return {};
+}
+function textPoints(text, inherited = {}) {
+  text = tidy(text);
+  const ranges = { ...inherited };
+  text = text.replace(CLOSED, (_, v, a, b, st) => { a = Number(a); b = Number(b); const step = Math.max(1, Number(st || 1));
+    ranges[v] = []; if (b >= a && (b - a) / step <= 4000) for (let x = a; x <= b; x += step) ranges[v].push(x); return " "; });
+  text = text.replace(OPEN, (_, v, a, st) => { a = Number(a); const step = Math.max(1, Number(st || 1)); ranges[v] = []; for (let k = 0; k < 30; k++) ranges[v].push(a + k * step); return " "; });
+  text = text.replace(/\b[a-zA-Z_]\w*\s*\([^()<>]*\)\s*=/g, " ");
+  const bodies = []; text = text.replace(/<([^<>]*)>/g, (_, b) => { bodies.push(b); return " "; });
+  const out = [];
+  for (const body of bodies) {
+    const parts = []; let depth = 0, cur = "";
+    for (const ch of body) { if (ch === "(") depth++; if (ch === ")") depth--; if (ch === "," && depth === 0) { parts.push(cur); cur = ""; } else cur += ch; }
+    parts.push(cur);
+    if (parts.length > 2 || parts.some((q) => !q.trim())) return null;
+    const vars = [...new Set((body.match(/[a-zA-Z_]\w*/g) || []).filter((v) => !CALC_FNS.includes(v.toLowerCase()) && v !== "pi" && !(v === "e" && !ranges.e)))];
+    if (vars.some((v) => !ranges[v] || !ranges[v].length)) return null;   // a variable with no range: Peener would ask for one
+    let combos = [{}];
+    for (const v of vars) { combos = combos.flatMap((e) => ranges[v].map((x) => ({ ...e, [v]: x }))); if (combos.length > 4000) return null; }
+    for (const env of combos) {
+      let p; try { p = parts.map((q) => down(evalFn(q, NaN, false, env))); } catch { return null; }
+      if (p.every(Number.isFinite)) out.push(parts.length === 1 ? [p[0], 0] : p);
+    }
+  }
+  const rest = text.replace(/\b[a-zA-Z]{2,}\b/g, " ");
+  const re = new RegExp(String.raw`(${NUM})\s*,\s*(${NUM})`, "g"); let m;
+  while ((m = re.exec(rest))) out.push([eval1(m[1]), eval1(m[2])]);
+  return out.length ? out : null;
 }
 // formula walls are joined into solid lines, as Peener does
 function joinLine(pts) {
@@ -372,7 +424,8 @@ function joinLine(pts) {
   });
   return out;
 }
-const solid = (ps, P) => (P && ps.mode === "fn" ? joinLine(P.map(([x, y]) => [Math.round(x), Math.round(y)])) : P);
+const oneVarText = (ps) => ps.mode === "text" && /</.test(ps.text || "") && ((ps.text || "").match(/\.\.|\bto\b/g) || []).length === 1;
+const solid = (ps, P) => (P && (ps.mode === "fn" || oneVarText(ps)) ? joinLine(P.map(([x, y]) => [Math.round(x), Math.round(y)])) : P);
 function eval1(s) { const [p, q] = s.split("/"); return Number(p) / (q ? Number(q) : 1); }
 const niceStep = (span, target = 8) => { const raw = span / target, e = 10 ** Math.floor(Math.log10(raw)); for (const m of [1, 2, 5, 10]) if (m * e >= raw) return m * e; return 10 * e; };
 const startDay = (it) => (it.useDay ? Math.max(0, Math.round(Number(it.day) || 0)) : 0);
@@ -384,8 +437,10 @@ function preview() {
   let wn = 0, skipped = 0, later = 0;
   for (const it of items) {
     if (it.kind === "wall") { const P = solid(it.pts, pointsOf(it.pts)); if (P) walls.push({ P, color: hexOk(it.color) ? it.color : WALL }); else skipped++; continue; }
-    const S = it.wall ? solid(it.starts, pointsOf(it.starts)) : pointsOf(it.starts), M = pointsOf(it.moves), col = it.useColor && hexOk(it.color) ? it.color : PALETTE[wn % PALETTE.length]; wn++;
+    const S = it.wall ? solid(it.starts, pointsOf(it.starts)) : pointsOf(it.starts), col = it.useColor && hexOk(it.color) ? it.color : PALETTE[wn % PALETTE.length]; wn++;
+    const noMoves = it.moves.mode === "text" && !(it.moves.text || "").trim(), M = noMoves ? [] : pointsOf(it.moves, startRanges(it.starts));
     if (!S) { skipped++; continue; }
+    if (!M) skipped++;
     const day = startDay(it); if (day > 0) later++;
     draw.push({ S, M: M || [], col: it.wall ? (it.useColor && hexOk(it.color) ? it.color : WALLWEEN) : col, wall: it.wall, day });
   }
@@ -440,7 +495,7 @@ function preview() {
   }
   g.restore();
   $("prevNote").textContent = "● ween  ◆ wall ween  ■ wall.  Hollow shapes start later (labelled with their day). Lines: one day of moves from the first start."
-    + (skipped ? ` (${skipped} item${skipped === 1 ? "" : "s"} typed as text not shown.)` : "");
+    + (skipped ? ` (${skipped} part${skipped === 1 ? "" : "s"} couldn't be drawn here; Peener Sim will say why if something's wrong.)` : "");
 }
 // ── events ────────────────────────────────────────────────────────────────────────────────────────
 function setField(it, path, v) { const ks = path.split("."); let o = it; for (let k = 0; k < ks.length - 1; k++) o = o[ks[k]]; o[ks[ks.length - 1]] = v; }
