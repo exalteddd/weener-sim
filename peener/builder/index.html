@@ -109,7 +109,7 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
           <option value="box">A ween boxed in by walls</option>
           <option value="grow">A wall ween that grows</option>
           <option value="ghost">A ween that ignores walls</option>
-          <option value="relay">Lifespan: a relay of weens</option>
+          <option value="ripples">Lifespan: ripples</option>
           <option value="lid">Lifespan: a box whose lid vanishes</option>
         </select>
         <button type="button" id="clearAll" style="margin-left:auto">Clear all</button>
@@ -230,7 +230,7 @@ function render() {
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="number" data-f="day" min="0" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} aria-label="Start day"></div>
           <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
           <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="number" data-f="weight" step="any" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} aria-label="Weight"></div>
-          <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="number" data-f="life" min="1" step="1" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} aria-label="Lifespan in days"><span class="note">days, then it vanishes</span></div>
+          <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="number" data-f="life" min="1" step="1" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} aria-label="Lifespan in days"><span class="note">days: each dot vanishes that long after it appears</span></div>
           <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: no other ween, wall weens included, can land on or cross its dots</label></div>
           <div class="check"><label><input type="checkbox" data-f="blocked" ${it.blocked ? "checked" : ""}> Blocked by walls</label></div>
         </div></div>`;
@@ -408,8 +408,7 @@ $("preset").addEventListener("change", () => {
   else if (v === "box") items = [newWall({ pts: FN("t", "12", -12, 12) }), newWall({ pts: FN("t", "-12", -12, 12) }), newWall({ pts: FN("12", "t", -12, 12) }), newWall({ pts: FN("-12", "t", -12, 12) }), newWeen(0)];
   else if (v === "grow") items = [newWeen(0, { starts: P("0,10"), moves: P("1,0 -1,0"), wall: true, useColor: false, color: WALLWEEN }), newWeen(1)];
   else if (v === "ghost") items = [newWall({ pts: FN("t", "6", -15, 15) }), newWeen(0), newWeen(1, { starts: P("3,0"), blocked: false })];
-  else if (v === "relay") items = [newWeen(0, { useLife: true, life: 10 }), newWeen(1, { moves: P("1,1 -1,0 0,-1"), useDay: true, day: 10, useLife: true, life: 10 }),
-    newWeen(2, { moves: P("1,0 -1,0 0,1 0,-1"), useDay: true, day: 20 })];
+  else if (v === "ripples") items = [0, 1, 2].map((k) => newWeen(k, { useDay: k > 0, day: 10 * k, useLife: true, life: 4 }));
   else if (v === "lid") items = [newWall({ pts: FN("t", "-12", -12, 12) }), newWall({ pts: FN("12", "t", -12, 12) }), newWall({ pts: FN("-12", "t", -12, 12) }),
     newWeen(0, { starts: FN("t", "12", -12, 12), moves: P(""), wall: true, color: WALLWEEN, useLife: true, life: 15 }), newWeen(1)];
   if (v) render();

@@ -202,7 +202,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>{</code> starts <code>:</code> moves <code>;</code> options <code>}</code>: the colon splits where it starts from how it moves; each <code>;</code> adds an option (day, color, weight, wall, ignores walls, lifespan); no colon means no moves</li>
     <li><code>wall{&lt;t, 12&gt; t=-40..40 ; color #555}</code> a plain wall: it blocks weens but never grows and isn't counted; a one-variable formula is drawn as a solid line, so <code>wall{&lt;t, 3t&gt; t=-9..9}</code> has no gaps</li>
     <li><code>{[0,0] : [1,0] [0,1] ; ignores walls}</code> a ween that passes through every wall</li>
-    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10}</code> a ween that vanishes 10 days after it starts (its dots go, and a wall ween stops blocking)</li>
+    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10}</code> each dot of this ween vanishes 10 days after it appears, so it spreads as a band 10 days thick; it never grows back where it has been, and a wall ween's dots stop blocking once they vanish</li>
     <li class="exh">Weight and walls</li>
     <li>a cell's weight is the total weight of the weens that have reached it</li>
     <li><i>Paint walls</i> (under the painting): drag to draw walls; no move can land on, jump over or squeeze past one, so a 1-dot wall is enough; Shift-drag erases</li>
@@ -223,8 +223,9 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><button type="button" class="ex">{[-25,0] : [1,0] [0,1] [-1,-1] ; color #2f6fd6} {[25,0] : [2,1] [-1,1] [-1,-2] ; day 8 ; color gold ; weight 3}</button> a late, heavy ween</li>
     <li><button type="button" class="ex">wall{&lt;t, 12&gt; t=-12..12} wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a ween boxed in by four walls</li>
     <li><button type="button" class="ex">{[0,10] : [1,0] [-1,0] ; wall} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a wall that grows sideways above a ween</li>
-    <li><button type="button" class="ex">{[-20,0] : [1,0] [0,1] [-1,-1] ; lifespan 12} {[20,0] : [1,0] [0,1] [-1,-1] ; color blue}</button> lifespan: the red ween vanishes on day 12, the blue one keeps going</li>
-    <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10} {[0,0] : [1,1] [-1,0] [0,-1] ; day 10 ; lifespan 10 ; color blue} {[0,0] : [1,0] [-1,0] [0,1] [0,-1] ; day 20 ; color gold}</button> a relay: each ween lives 10 days, then the next takes over</li>
+    <li><button type="button" class="ex">{[-25,0] : [1,0] [0,1] [-1,-1] ; lifespan 8} {[25,0] : [1,0] [0,1] [-1,-1] ; color blue}</button> lifespan: each red dot lasts 8 days, so red spreads as a ring; blue keeps all of its dots</li>
+    <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 4} {[0,0] : [1,0] [0,1] [-1,-1] ; day 10 ; lifespan 4 ; color blue} {[0,0] : [1,0] [0,1] [-1,-1] ; day 20 ; lifespan 4 ; color gold}</button> ripples: three weens 10 days apart, each dot lasting 4 days</li>
+    <li><button type="button" class="ex">{[0,12] : [1,0] [-1,0] ; wall ; lifespan 6 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a wall ween whose dots last 6 days: a gap opens in its middle and the ween gets through</li>
     <li><button type="button" class="ex">wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {&lt;t, 12&gt; t=-12..12 ; wall ; lifespan 15 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a box whose lid (a wall ween) vanishes on day 15, letting the ween out</li>
     <li><button type="button" class="ex">0 1 5</button> a line</li>
     <li><button type="button" class="ex">&lt;t, t^2&gt; t=-3..3</button> a parabola</li>
@@ -495,9 +496,11 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = []) {
     for (const [x, y] of g.moves) { mx0 = Math.min(mx0, x); mx1 = Math.max(mx1, x); my0 = Math.min(my0, y); my1 = Math.max(my1, y); }
   }
   const NG = groups.length, day = groups.map((g) => g.day | 0), wt = groups.map((g) => (g.weight == null ? 1 : g.weight));
-  // a ween with a lifespan L vanishes L days after it starts: gone from day (start + L) on
-  const death = groups.map((g, b) => (g.life > 0 ? day[b] + g.life : Infinity)), dead = groups.map(() => false);
-  const maxDeath = Math.max(0, ...death.filter(Number.isFinite));
+  // lifespan L: each dot of the ween vanishes L days after it appears, and the ween never grows back where it has been
+  const life = groups.map((g) => (g.life > 0 ? g.life : Infinity)), mortal = life.map(Number.isFinite), anyMortal = mortal.some(Boolean);
+  const maxDeath = Math.max(0, ...groups.map((g, b) => (mortal[b] ? day[b] + life[b] : 0)));
+  // bitmaps: one per ween (every point it has reached), the union of living dots, then one per ween for its vanished dots
+  const GONE = NG + 1, NMAP = NG + 1 + (anyMortal ? NG : 0);
   const blk = makeBlocker(walls, groups.map((g) => g.moves), q);
   const isWall = groups.map((g) => !!g.wall), wallIdx = [];
   groups.forEach((g, b) => { if (g.wall) wallIdx.push(b); });
@@ -506,13 +509,13 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = []) {
   const heldWall = (x, y, skip) => {
     const X = x + L.ox, Y = y + L.oy; if (X < 0 || Y < 0 || X >= L.W || Y >= L.H) return false;
     const i = X + Y * L.W, w = i >>> 5, m = 1 << (i & 31);
-    for (const k of wallIdx) if (k !== skip && !dead[k] && maps[k][w] & m) return true;
+    for (const k of wallIdx) if (k !== skip && maps[k][w] & m && !(mortal[k] && maps[GONE + k][w] & m)) return true;
     return false;
   };
   const crossesWall = (b, gi, x, y) => { const p = paths[b][gi]; for (let k = 0; k < p.length; k += 2) if (heldWall(x + p[k], y + p[k + 1], b)) return true; return false; };
   const maxStart = Math.max(0, ...day);
   const lay = (nc) => ({ W: sx1 - sx0 + nc * (mx1 - mx0) + 1, H: sy1 - sy0 + nc * (my1 - my0) + 1, ox: -(sx0 + nc * mx0), oy: -(sy0 + nc * my0) });
-  let lo = 1, hi = 1 << 30; while (lo < hi) { const m = Math.ceil((lo + hi) / 2); const L = lay(m); ((NG + 1) * L.W * L.H <= maxBits) ? lo = m : hi = m - 1; }
+  let lo = 1, hi = 1 << 30; while (lo < hi) { const m = Math.ceil((lo + hi) / 2); const L = lay(m); (NMAP * L.W * L.H <= maxBits) ? lo = m : hi = m - 1; }
   const nMax = lo;
   // a wall covers its whole 1×1 square, fractions included
   const wlo = -Math.floor((q - 1) / 2), whi = q - 1 + wlo, WP = [];
@@ -528,7 +531,7 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = []) {
   };
   const grow = (nc) => {
     const Ln = lay(nc), words = Math.ceil(Ln.W * Ln.H / 32);
-    maps = Array.from({ length: NG + 1 }, (_, b) => {
+    maps = Array.from({ length: NMAP }, (_, b) => {
       const nb = new Int32Array(words);
       if (maps) { const old = maps[b]; for (let w = 0; w < old.length; w++) { let v = old[w]; while (v) { const bit = 31 - Math.clz32(v & -v); v &= v - 1;
         const id = w * 32 + bit, x = (id % L.W) - L.ox, y = Math.floor(id / L.W) - L.oy, ni = x + Ln.ox + (y + Ln.oy) * Ln.W; nb[ni >>> 5] |= 1 << (ni & 31); } } }
@@ -546,62 +549,73 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = []) {
   let period = q;
   const mark = (b, x, y) => { const i = x + L.ox + (y + L.oy) * L.W, w = i >>> 5, m = 1 << (i & 31); if (maps[b][w] & m) return false; maps[b][w] |= m; return true; };
   const held = new Float64Array(NG);
-  let fronts = groups.map(() => []), cnt = 0, live = 0;
-  // moves blocked by a wall ween are tried again when that wall ween vanishes
+  // a front holds x, y and the day that dot appeared
+  let fronts = groups.map(() => []), cnt = 0, live = 0, wallGone = false;
+  // moves blocked by a wall ween's dot are tried again once a wall dot vanishes, if the dot making them is still alive
   const pending = groups.map(() => []), pendKeys = groups.map(() => new Set());
-  const addPending = (b, x, y) => { const k = x + "," + y; if (!pendKeys[b].has(k)) { pendKeys[b].add(k); pending[b].push(x, y); } };
+  const addPending = (b, x, y, t) => { const k = x + "," + y; if (!pendKeys[b].has(k)) { pendKeys[b].add(k); pending[b].push(x, y, t); } };
   const wallPts = new Set(); for (let k = 0; k < WP.length; k += 2) wallPts.add(WP[k] + "," + WP[k + 1]);
-  const vanish = (b) => {
-    dead[b] = true; fronts[b] = []; pending[b] = []; pendKeys[b].clear();
-    // its dots leave the count unless another living ween holds them too
-    const mb = maps[b], ghostB = !!groups[b].ghost;
-    for (let w = 0; w < mb.length; w++) { let v = mb[w]; while (v) { const bit = 31 - Math.clz32(v & -v); v &= v - 1;
-      const id = w * 32 + bit, x = (id % L.W) - L.ox, y = Math.floor(id / L.W) - L.oy;
+  const born = groups.map(() => new Map()), today = groups.map(() => []);   // a mortal ween's dots by the day they appeared
+  const keepBorn = (n) => { for (let b = 0; b < NG; b++) if (mortal[b]) { if (today[b].length) born[b].set(n, today[b]); today[b] = []; } };
+  // the dots ween b grew on day t vanish; each leaves the count unless another ween's living dot is on the same point
+  const vanish = (b, t) => {
+    const pts = born[b].get(t); if (!pts) return; born[b].delete(t);
+    const G = maps[GONE + b];
+    if (isWall[b]) wallGone = true;
+    for (let i = 0; i < pts.length; i += 2) {
+      const x = pts[i], y = pts[i + 1], id = x + L.ox + (y + L.oy) * L.W, w = id >>> 5, m = 1 << (id & 31);
+      G[w] |= m;
       if (x % q || y % q) continue;
-      const onWall = wallPts.has(x + "," + y);
-      if (onWall && !ghostB) continue;   // a wall mark, not one of its dots
+      held[b]--;
+      const onWall = wallPts.has(x + "," + y);   // only a ghost has dots on plain walls; the others' bits there are wall marks
       let other = false;
-      for (let k = 0; k < NG && !other; k++) if (k !== b && !dead[k] && (maps[k][w] & (1 << bit)) && (!onWall || groups[k].ghost)) other = true;
-      if (!other && (maps[U][w] & (1 << bit))) { maps[U][w] &= ~(1 << bit); live--; }
-    } }
-    if (isWall[b]) for (let k = 0; k < NG; k++) if (!dead[k] && pending[k].length) { fronts[k] = fronts[k].concat(pending[k]); pending[k] = []; pendKeys[k].clear(); }
+      for (let k = 0; k < NG && !other; k++) if (k !== b && (maps[k][w] & m) && !(mortal[k] && maps[GONE + k][w] & m) && (!onWall || groups[k].ghost)) other = true;
+      if (!other && (maps[U][w] & m)) { maps[U][w] &= ~m; live--; }
+    }
   };
   const seed = (b) => {
     const fr = [];
     for (const [x, y] of groups[b].starts) {
       if (!groups[b].ghost && wallIdx.length && heldWall(x, y, b)) continue;
-      if (mark(b, x, y)) { fr.push(x, y); if (x % q === 0 && y % q === 0) { held[b]++; if (mark(U, x, y)) cnt++; } }
+      if (mark(b, x, y)) { fr.push(x, y, day[b]); if (mortal[b]) today[b].push(x, y); if (x % q === 0 && y % q === 0) { held[b]++; if (mark(U, x, y)) cnt++; } }
     }
     fronts[b] = fr;
   };
   // one day for one ween
   const step = (b, n) => {
-    if (day[b] >= n || dead[b]) return;
+    if (day[b] >= n) return;
     const ghost = !!groups[b].ghost, fr = fronts[b], nx = [], mv = groups[b].moves, guard = !ghost && wallIdx.some((k) => k !== b);
-    for (let i = 0; i < fr.length; i += 2) for (let gi = 0; gi < mv.length; gi++) {
+    for (let i = 0; i < fr.length; i += 3) for (let gi = 0; gi < mv.length; gi++) {
       const gx = mv[gi][0], gy = mv[gi][1];
       if (blk && !ghost && blk(b, gi, fr[i], fr[i + 1])) continue;
-      if (guard && crossesWall(b, gi, fr[i], fr[i + 1])) { addPending(b, fr[i], fr[i + 1]); continue; }
+      if (guard && crossesWall(b, gi, fr[i], fr[i + 1])) { addPending(b, fr[i], fr[i + 1], fr[i + 2]); continue; }
       const x = fr[i] + gx, y = fr[i + 1] + gy;
-      if (mark(b, x, y)) { nx.push(x, y); if (x % q === 0 && y % q === 0) { held[b]++; if (mark(U, x, y)) cnt++; } }
+      if (mark(b, x, y)) { nx.push(x, y, n); if (mortal[b]) today[b].push(x, y); if (x % q === 0 && y % q === 0) { held[b]++; if (mark(U, x, y)) cnt++; } }
     }
     fronts[b] = nx;
   };
-  const totalW = () => { let t = 0; for (let b = 0; b < NG; b++) if (!dead[b]) t += wt[b] * held[b]; return t; };
+  const totalW = () => { let t = 0; for (let b = 0; b < NG; b++) t += wt[b] * held[b]; return t; };
   for (const b of wallIdx) if (day[b] === 0) seed(b);
   for (let b = 0; b < NG; b++) if (!isWall[b] && day[b] === 0) seed(b);
+  keepBorn(0);
   live = cnt;
   const f = [live], W = [totalW()];
   let s = (r + 1) * q, reason = "stable";
   for (let n = 1; ; n++) {
     if (n > cap) { if (cap >= nMax) { reason = "budget"; break; } grow(Math.min(nMax, Math.max(n, Math.ceil(cap * 1.42)))); }
-    cnt = 0;
-    for (let b = 0; b < NG; b++) if (death[b] === n) vanish(b);   // weens whose lifespan is up go first
+    cnt = 0; wallGone = false;
+    for (let b = 0; b < NG; b++) if (mortal[b]) vanish(b, n - life[b]);   // dots whose lifespan is up go first
+    // a wall dot went: blocked moves get another try, from dots that were still alive yesterday
+    if (wallGone) for (let b = 0; b < NG; b++) if (pending[b].length) {
+      const Pd = pending[b]; pending[b] = []; pendKeys[b].clear();
+      for (let i = 0; i < Pd.length; i += 3) if (Pd[i + 2] >= n - life[b]) fronts[b].push(Pd[i], Pd[i + 1], Pd[i + 2]);
+    }
     // walls move first (and new walls appear) so the day's walls already stand when the other weens move
     for (const b of wallIdx) step(b, n);
     for (const b of wallIdx) if (day[b] === n) seed(b);
     for (let b = 0; b < NG; b++) if (!isWall[b]) step(b, n);
     for (let b = 0; b < NG; b++) if (!isWall[b] && day[b] === n) seed(b);
+    keepBorn(n);
     live += cnt; f.push(live); W.push(totalW());
     let settled = false;
     for (let p = 1; p <= PER; p++) {
@@ -761,20 +775,22 @@ onmessage = (e) => {
   const blk = makeBlocker(Array.from(walls, (c) => [(c % N) - cx, cy - ((c / N) | 0)]), groups.map((g) => g.moves), q);
   const wallIdx = []; groups.forEach((g, b) => { if (g.wall) wallIdx.push(b); });
   const pathOffs = groups.map((g) => g.moves.map(([a, c]) => { const p = pathSquares(a, c), o2 = []; for (let k = 0; k < p.length; k += 2) o2.push(p[k] - p[k + 1] * BW); return Int32Array.from(o2); }));
-  // a ween with a lifespan L vanishes L days after it starts
-  const death = groups.map((g) => (g.life > 0 ? (g.day | 0) + g.life : Infinity)), dead = groups.map(() => false);
-  const maxDeath = Math.max(0, ...death.filter(Number.isFinite));
-  const crossesWall = (b, g, base) => { const p = pathOffs[b][g]; for (let k = 0; k < p.length; k++) { const t = base + p[k]; for (const w of wallIdx) if (w !== b && !dead[w] && vis[w][t] === 1) return true; } return false; };
+  // lifespan L: each dot of the ween vanishes L days after it appears (a vanished dot is marked 3, so it is never regrown
+  // and no longer blocks); the ween never grows back where it has been
+  const life = groups.map((g) => (g.life > 0 ? g.life : Infinity)), mortal = life.map(Number.isFinite);
+  const crossesWall = (b, g, base) => { const p = pathOffs[b][g]; for (let k = 0; k < p.length; k++) { const t = base + p[k]; for (const w of wallIdx) if (w !== b && vis[w][t] === 1) return true; } return false; };
   const isWallCell = new Uint8Array(N * M); for (const c of walls) isWallCell[c] = 1;
-  const holders = new Uint8Array(N * M), own = groups.map(() => []);   // living weens on each painting point; each ween's points
-  const pending = groups.map(() => []), pendSet = groups.map(() => new Set());   // moves blocked by a wall ween, retried when it vanishes
-  let live = 0, full = N * M - walls.length;
+  const holders = new Uint8Array(N * M);   // living dots on each painting point
+  const born = groups.map(() => new Map()), today = groups.map(() => []);   // a mortal ween's dots by the day they appeared
+  // moves blocked by a wall ween's dot (point, the day it appeared), tried again once a wall dot vanishes
+  const pendK = groups.map(() => []), pendT = groups.map(() => []), pendSet = groups.map(() => new Set()), retry = groups.map(() => null);
+  let live = 0, full = N * M - walls.length, lastDeath = 0, wallGone = false;
   let cells = new Int32Array(1 << 16), grps = new Uint8Array(1 << 16), nc = 0, counts = [], lives = [], last = Date.now();
   let eToday = 0;
   const ev = (k, b) => {
     const c = cellOf(k); if (c < 0) return;
     if (nc === cells.length) { const t = new Int32Array(nc * 2); t.set(cells); cells = t; const u = new Uint8Array(nc * 2); u.set(grps); grps = u; }
-    cells[nc] = c; grps[nc++] = b; eToday++; if (death[b] !== Infinity) own[b].push(c);
+    cells[nc] = c; grps[nc++] = b; eToday++;
     if (holders[c]++ === 0 && !isWallCell[c]) live++;
   };
   const started = groups.map(() => false), fronts = groups.map(() => new Int32Array(0));
@@ -782,54 +798,73 @@ onmessage = (e) => {
     const fr = [];
     for (const [x, y] of groups[b].starts) {
       const k = idx(x, y);
-      if (!groups[b].ghost && wallIdx.some((w) => w !== b && !dead[w] && vis[w][k] === 1)) continue;
+      if (!groups[b].ghost && wallIdx.some((w) => w !== b && vis[w][k] === 1)) continue;
       if (!vis[b][k]) { vis[b][k] = 1; fr.push(k); ev(k, b); }
     }
     fronts[b] = Int32Array.from(fr); started[b] = true;
+    if (mortal[b] && fr.length) today[b].push(fronts[b]);
   };
-  const vanish = (b) => {
-    dead[b] = true; fronts[b] = new Int32Array(0);
-    for (const c of own[b]) if (--holders[c] === 0 && !isWallCell[c]) live--;
-    if (groups[b].wall) groups.forEach((g, k) => {
-      if (dead[k] || !pending[k].length) return;
-      const m = new Int32Array(fronts[k].length + pending[k].length); m.set(fronts[k]); m.set(pending[k], fronts[k].length);
-      fronts[k] = m; pending[k] = []; pendSet[k].clear();
-    });
+  // the dots ween b grew on day t vanish
+  const vanish = (b, t) => {
+    const chunks = born[b].get(t); if (!chunks) return; born[b].delete(t);
+    const V = vis[b], wall = !!groups[b].wall;
+    if (wall) wallGone = true;
+    for (const ch of chunks) for (let i = 0; i < ch.length; i++) {
+      const k = ch[i]; if (wall) V[k] = 3;
+      const c = cellOf(k); if (c >= 0 && --holders[c] === 0 && !isWallCell[c]) live--;
+    }
   };
   const step = (b) => {
-    if (!started[b] || dead[b] || !fronts[b].length) return;
-    const ghost = !!groups[b].ghost, fr = fronts[b], V = vis[b], off = offs[b], K = off.length, guard = !ghost && wallIdx.some((w) => w !== b);
-    let next = new Int32Array(Math.max(1024, fr.length * 2)), nl = 0;
-    for (let i = 0; i < fr.length; i++) {
-      const base = fr[i];
-      if (nl + K > next.length) { const t = new Int32Array(next.length * 2); t.set(next); next = t; }
-      if ((blk && !ghost) || guard) {
-        const bx = (base % BW) - o + X0, by = Y1 - (((base / BW) | 0) - o);
-        for (let g = 0; g < K; g++) {
-          const k = base + off[g];
-          if (V[k] || (blk && !ghost && blk(b, g, bx, by))) continue;
-          if (guard && crossesWall(b, g, base)) { if (!pendSet[b].has(base)) { pendSet[b].add(base); pending[b].push(base); } continue; }
-          V[k] = 1; next[nl++] = k; ev(k, b);
-        }
-      } else for (let g = 0; g < K; g++) { const k = base + off[g]; if (V[k]) continue; V[k] = 1; next[nl++] = k; ev(k, b); }
-    }
+    const R = retry[b]; retry[b] = null;
+    if (!started[b] || (!fronts[b].length && !R)) return;
+    const ghost = !!groups[b].ghost, V = vis[b], off = offs[b], K = off.length, guard = !ghost && wallIdx.some((w) => w !== b);
+    let next = new Int32Array(Math.max(1024, (fronts[b].length + (R ? R.k.length : 0)) * 2)), nl = 0;
+    // sources: yesterday's new dots, then any blocked dots getting another try (ts = the day each appeared)
+    const run = (fr, ts) => {
+      for (let i = 0; i < fr.length; i++) {
+        const base = fr[i];
+        if (nl + K > next.length) { const t = new Int32Array(next.length * 2); t.set(next.subarray(0, nl)); next = t; }
+        if ((blk && !ghost) || guard) {
+          const bx = (base % BW) - o + X0, by = Y1 - (((base / BW) | 0) - o);
+          for (let g = 0; g < K; g++) {
+            const k = base + off[g];
+            if (V[k] || (blk && !ghost && blk(b, g, bx, by))) continue;
+            if (guard && crossesWall(b, g, base)) { if (!pendSet[b].has(base)) { pendSet[b].add(base); pendK[b].push(base); pendT[b].push(ts ? ts[i] : d - 1); } continue; }
+            V[k] = 1; next[nl++] = k; ev(k, b);
+          }
+        } else for (let g = 0; g < K; g++) { const k = base + off[g]; if (V[k]) continue; V[k] = 1; next[nl++] = k; ev(k, b); }
+      }
+    };
+    run(fronts[b], null); if (R) run(R.k, R.t);
     fronts[b] = next.subarray(0, nl);
+    if (mortal[b] && nl) today[b].push(fronts[b]);
   };
   const maxStart = Math.max(0, ...groups.map((g) => g.day | 0));
   groups.forEach((g, b) => { if (g.wall && (g.day | 0) === 0) seed(b); });
   groups.forEach((g, b) => { if (!g.wall && (g.day | 0) === 0) seed(b); });
+  const keepBorn = () => groups.forEach((g, b) => { if (mortal[b] && today[b].length) { born[b].set(d, today[b]); today[b] = []; lastDeath = Math.max(lastDeath, d + life[b]); } });
+  let d = 0;
+  keepBorn();
   counts.push(eToday); lives.push(live);
   const flush = (done) => { postMessage({ cells: cells.slice(0, nc), grps: grps.slice(0, nc), counts: Int32Array.from(counts), lives: Int32Array.from(lives), done }); nc = 0; counts = []; lives = []; last = Date.now(); };
-  let d = 0;
-  while (d < 65533 && (d < maxStart || d < maxDeath || fronts.some((fr) => fr.length))) {
+  while (d < 65533 && (d < maxStart || d < lastDeath || fronts.some((fr) => fr.length))) {
     if (groups.length === 1 && !groups[0].life && live >= full) break;   // one ween: nothing more to show once the picture is full
-    d++; eToday = 0;
-    groups.forEach((g, b) => { if (death[b] === d) vanish(b); });   // weens whose lifespan is up go first
+    d++; eToday = 0; wallGone = false;
+    groups.forEach((g, b) => { if (mortal[b]) vanish(b, d - life[b]); });   // dots whose lifespan is up go first
+    // a wall dot went: blocked moves get another try, from dots that were still alive yesterday
+    if (wallGone) groups.forEach((g, b) => {
+      if (!pendK[b].length) return;
+      const k = [], t = [];
+      for (let i = 0; i < pendK[b].length; i++) if (pendT[b][i] >= d - life[b]) { k.push(pendK[b][i]); t.push(pendT[b][i]); }
+      pendK[b] = []; pendT[b] = []; pendSet[b].clear();
+      if (k.length) retry[b] = { k: Int32Array.from(k), t: Int32Array.from(t) };
+    });
     // walls move first (and new walls appear) so the day's walls already stand when the other weens move
     groups.forEach((g, b) => { if (g.wall) step(b); });
     groups.forEach((g, b) => { if (g.wall && !started[b] && (g.day | 0) === d) seed(b); });
     groups.forEach((g, b) => { if (!g.wall) step(b); });
     groups.forEach((g, b) => { if (!g.wall && !started[b] && (g.day | 0) === d) seed(b); });
+    keepBorn();
     counts.push(eToday); lives.push(live);
     if (Date.now() - last > 120) flush(false);
   }
@@ -1392,8 +1427,8 @@ function startReach() {
     if (!next) {
       next = { pic, order: new Int32Array(Math.max(1024, cells.length * 2)), n: 0, offsets: [0], live: [], maxDay: -1, done: false,
         groups: forGroups, simple: forSimple, walls: wallCells(pic).length, dayOf: forGroups.map(() => new Int32Array(pic.N * pic.M).fill(0x7fffffff)),
-        death: forGroups.map((g) => (g.life > 0 ? g.day + g.life : Infinity)) };
-      next.lastDeath = Math.max(0, ...next.death.filter(Number.isFinite));
+        life: forGroups.map((g) => (g.life > 0 ? g.life : Infinity)) };
+      next.lastLife = Math.max(0, ...next.life.filter(Number.isFinite));
       reach = next; shown = -1; pic.comp.data.set(pic.base);
     }
     if (next.n + cells.length > next.order.length) { const t = new Int32Array(Math.max(next.order.length * 2, next.n + cells.length)); t.set(next.order.subarray(0, next.n)); next.order = t; }
@@ -1401,8 +1436,11 @@ function startReach() {
     if (next.dayOf) { let p = 0; for (let k = 0; k < counts.length; k++) { const dd = next.offsets.length - 1 + k; for (let t = 0; t < counts[k]; t++, p++) { const D = next.dayOf[grps[p]]; if (D[cells[p]] > dd) D[cells[p]] = dd; } } }
     for (const c of counts) next.offsets.push(next.offsets[next.offsets.length - 1] + c);
     for (const c of lives) next.live.push(c);
-    // no painting points on the last days: trim them, but keep every day up to the last ween's vanishing
-    if (done) while (next.offsets.length > 2 && next.offsets.length - 2 > next.lastDeath && next.offsets[next.offsets.length - 1] === next.offsets[next.offsets.length - 2]) { next.offsets.pop(); next.live.pop(); }   // no painting points on the last days
+    // no new painting points on the last days: trim them, but keep the days until the last dots have vanished
+    if (done) {
+      let e = next.offsets.length - 2; while (e > 0 && next.offsets[e + 1] === next.offsets[e]) e--;
+      while (next.offsets.length > 2 && next.offsets.length - 2 > e + next.lastLife) { next.offsets.pop(); next.live.pop(); }
+    }
     const grew = next.maxDay < 0 || done;
     next.maxDay = next.offsets.length - 2; next.done = done;
     if (grew) { if (fastRes) factsFast(); else if (tableFor) facts(...tableFor); }
@@ -1420,9 +1458,9 @@ let forGroups = null, forSimple = true;
 // a point's colour on day d: the weight-weighted mix of the colours of the weens that hold it (one plain ween: the reds)
 function cellColour(t, d) {
   if (reach.simple) return reach.dayOf[0][t] <= d ? REDS[t & 3] : null;
-  const G = reach.groups, D = reach.dayOf, X = reach.death;
+  const G = reach.groups, D = reach.dayOf, X = reach.life;
   let r = 0, g = 0, b = 0, ws = 0, r0 = 0, g0 = 0, b0 = 0, n = 0;
-  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < X[k]) {
+  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) {
     const c = G[k].rgb, w = Math.abs(G[k].weight);
     n++; r0 += c[0]; g0 += c[1]; b0 += c[2]; r += w * c[0]; g += w * c[1]; b += w * c[2]; ws += w;
   }
@@ -1433,8 +1471,8 @@ function cellColour(t, d) {
 }
 // total weight of a point on day d
 function cellWeight(t, d) {
-  let w = 0, n = 0; const G = reach.groups, D = reach.dayOf, X = reach.death;
-  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < X[k]) { w += G[k].weight; n++; }
+  let w = 0, n = 0; const G = reach.groups, D = reach.dayOf, X = reach.life;
+  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) { w += G[k].weight; n++; }
   return n ? w : null;
 }
 function applyDay(d) {
@@ -1442,11 +1480,10 @@ function applyDay(d) {
   const { order, offsets } = reach, px = pic.comp.data, base = pic.base, last = offsets.length - 2;
   const hi = Math.min(d, last), was = Math.min(shown, last);
   const put = (t) => { const c = cellColour(t, hi); if (c) { px[4 * t] = c[0]; px[4 * t + 1] = c[1]; px[4 * t + 2] = c[2]; } else { px[4 * t] = base[4 * t]; px[4 * t + 1] = base[4 * t + 1]; px[4 * t + 2] = base[4 * t + 2]; } };
-  // a ween vanishing between the two days changes points reached long ago: repaint everything shown so far
-  const a = Math.min(hi, was), z = Math.max(hi, was);
-  if (reach.death.some((x) => x > a && x <= z)) for (let k = 0; k < offsets[z + 1]; k++) put(order[k]);
-  else if (hi > was) for (let k = offsets[was + 1]; k < offsets[hi + 1]; k++) put(order[k]);
-  else for (let k = offsets[hi + 1]; k < offsets[was + 1]; k++) put(order[k]);
+  // points change between the two days where a dot appeared, or (lifespan L) where one that appeared L days earlier vanished
+  const a = Math.min(hi, was), z = Math.max(hi, was), span = (lo, top) => { lo = Math.max(lo, 0); top = Math.min(top, last); for (let k = offsets[lo]; k < offsets[top + 1]; k++) put(order[k]); };
+  span(a + 1, z);
+  for (const L of new Set(reach.life)) if (Number.isFinite(L) && z - L >= 0) span(a + 1 - L, z - L);
   shown = d; pic.cg.putImageData(pic.comp, 0, 0);
 }
 // Edge mask for the painting: solid inside, thinning to sparse dots over the outer band.
@@ -1567,7 +1604,7 @@ function legend(geo) {
   const G = geo && geo.general ? geo.groups : null;
   if ((!G || (G.length === 1 && G[0].plain && !G[0].day)) && !textWallGroups.length) { $("legend").innerHTML = ""; $("legendMore").hidden = true; return; }
   if (!G) { $("legend").innerHTML = textWallGroups.map((w) => `<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dots</span>`).join(""); foldLegend(); return; }
-  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.life ? `–${g.day + g.life - 1}` : ""} · weight ${+g.weight.toFixed(6)}</span>`);
+  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${+g.weight.toFixed(6)}</span>`);
   for (const w of textWallGroups) items.push(`<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dot${w.pts.length === 1 ? "" : "s"}</span>`);
   $("legend").innerHTML = items.join("");
   foldLegend();
@@ -1590,7 +1627,7 @@ function hoverInfo(e) {
   if (isWallAt(x, y)) txt += " · wall";
   else if (reach && reach.dayOf) {
     const parts = [], G = reach.groups; let w = 0;
-    for (let k = 0; k < G.length; k++) { const dd = reach.dayOf[k][t]; if (dd !== 0x7fffffff) { parts.push(`ween ${k + 1}${G[k].wall ? " (wall)" : ""} day ${dd}${Number.isFinite(reach.death[k]) ? `, gone day ${reach.death[k]}` : ""}`); if (dd <= d && d < reach.death[k]) w += G[k].weight; } }
+    for (let k = 0; k < G.length; k++) { const dd = reach.dayOf[k][t]; if (dd !== 0x7fffffff) { parts.push(`ween ${k + 1}${G[k].wall ? " (wall)" : ""} day ${dd}${Number.isFinite(reach.life[k]) ? `, gone day ${dd + reach.life[k]}` : ""}`); if (dd <= d && d < dd + reach.life[k]) w += G[k].weight; } }
     txt += parts.length ? ` · weight ${+w.toFixed(6)} on day ${d} · reached by ${parts.join(", ")}` : " · not reached";
   }
   $("unit").textContent = txt;
