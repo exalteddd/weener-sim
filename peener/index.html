@@ -194,7 +194,8 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>(1/2,1/2) (0.5,-1)</code> fractions: only sums landing on whole-number points count</li>
     <li><code>0 1 5</code> the set {0, 1, 5} on a number line</li>
     <li><code>00001,00000,01W00</code> a grid of marked cells</li>
-    <li><code>&lt;t, 2t&gt; t=0..5</code> a formula with a range; also <code>round sin cos sqrt pi abs min max</code></li>
+    <li><code>&lt;t, 2t&gt; t=0..5</code> a formula with a range; also <code>sin cos tan sqrt pi abs min max</code></li>
+    <li><code>&lt;t, t/2&gt; t=0..5</code> a formula's values are rounded down to whole numbers (2.5 → 2, −2.5 → −3); write <code>ceil(t/2)</code> to round up or <code>round(t/2)</code> for the nearest</li>
     <li><code>{[0,1] [0,2] : [1,1] [1,2]}</code> a ween: start at [0,1] and [0,2], move only by [1,1] and [1,2]; several weens combine</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; day 5 ; color blue ; weight 2}</code> a ween that starts on day 5, drawn blue, weighing 2</li>
     <li><code>{[0,10] : [1,0] [-1,0] ; wall}</code> a wall ween: no other ween, wall weens included, can land on or cross its dots; this one grows sideways</li>
@@ -881,6 +882,9 @@ const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt
 const MAXBITS = 2 ** 31, MAXDAY = 100000;
 
 // Formula input: ⟨expr, expr⟩ templates with integer ranges such as t=0..5, expanded over every combination of the ranges.
+// Every value a formula gives is rounded down to a whole number, unless it already is one: write ceil(…) to round up
+// or round(…) for the nearest. A hair of slack absorbs floating-point noise, so 0.1·30 still counts as 3.
+const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
 const FUNCS = ["abs", "min", "max", "round", "floor", "ceil", "sqrt", "sin", "cos", "tan"];
 function evalExpr(src, env) {
   const toks = src.match(/\d+(?:\.\d+)?|[a-zA-Z_]\w*|[-+*\/^%(),]|\S/g) || [];
@@ -906,7 +910,7 @@ function evalExpr(src, env) {
       if (next() !== "(") throw new Error(`Write ${t}(…) in "${src}".`);
       const a = [expr()]; while (peek() === ",") { next(); a.push(expr()); }
       if (next() !== ")") throw new Error(`Missing ")" in "${src}".`);
-      return t === "min" ? Math.min(...a) : t === "max" ? Math.max(...a) : t === "round" ? Math.round(a[0]) : Math[t](a[0]);
+      return t === "min" ? Math.min(...a) : t === "max" ? Math.max(...a) : t === "round" ? Math.round(a[0] + EPS) : t === "floor" ? down(a[0]) : t === "ceil" ? up(a[0]) : Math[t](a[0]);
     }
     if (t === "pi") return Math.PI;
     if (isName(t)) { if (!(t in env)) throw new Error(`Give a range for ${t}, like ${t}=0..5.`); return env[t]; }
@@ -966,7 +970,7 @@ function parse(text) {
     let combos = [{}];
     for (const v of vars) { combos = combos.flatMap((e) => ranges[v].map((x) => ({ ...e, [v]: x }))); if (combos.length > 20000) throw new Error("The ranges make more than 20,000 points; narrow them."); }
     for (const env of combos) {
-      const p = parts.map((q) => evalExpr(q, env));
+      const p = parts.map((q) => down(evalExpr(q, env)));   // rounded down unless ceil(…) or round(…) says otherwise
       if (p.some((x) => Math.abs(x) > 1e5)) throw new Error(`A coordinate passed 100000 at ${vars.map((v) => `${v}=${env[v]}`).join(", ")}.`);
       pts.push(dim === 1 ? [p[0], 0] : p);
     }

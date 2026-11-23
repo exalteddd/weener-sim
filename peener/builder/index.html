@@ -161,7 +161,7 @@ function pointsText(ps) {
   if (ps.mode === "fn") {
     const fx = ps.fx.trim(), fy = ps.fy.trim();
     if (!fx || !fy) return { text: "", err: "Fill in both x and y." };
-    if (!/^[\w\s+\-*/^%().,]*$/.test(fx + fy)) return { text: "", err: "x and y can use numbers, t, + − * / ^, ( ), pi and round sin cos sqrt abs min max floor." };
+    if (!/^[\w\s+\-*/^%().,]*$/.test(fx + fy)) return { text: "", err: "x and y can use numbers, t, + − * / ^, ( ), pi and ceil round floor sin cos sqrt abs min max." };
     const a = Number(ps.from), b = Number(ps.to), st = Number(ps.step) || 1;
     if (!Number.isInteger(a) || !Number.isInteger(b)) return { text: "", err: "The range for t needs whole numbers." };
     if (b < a) return { text: "", err: "The range for t runs backwards." };
@@ -206,7 +206,8 @@ function pointsForm(key, ps, label) {
   else if (ps.mode === "fn") body = `<div class="fn">x = <input type="text" data-f="${key}.fx" value="${esc(ps.fx)}" aria-label="x of t" spellcheck="false">
       y = <input type="text" data-f="${key}.fy" value="${esc(ps.fy)}" aria-label="y of t" spellcheck="false"> for t from
       <input type="number" data-f="${key}.from" value="${esc(ps.from)}" aria-label="t from"> to <input type="number" data-f="${key}.to" value="${esc(ps.to)}" aria-label="t to">
-      step <input type="number" data-f="${key}.step" value="${esc(ps.step)}" min="1" aria-label="step"></div>`;
+      step <input type="number" data-f="${key}.step" value="${esc(ps.step)}" min="1" aria-label="step"></div>
+      <div class="note">Values round down to whole numbers; write ceil(…) to round up, round(…) for the nearest.</div>`;
   else body = `<input type="text" class="wide" data-f="${key}.text" value="${esc(ps.text)}" placeholder="anything Peener accepts, e.g. <round(9cos(2pi t/12)), round(9sin(2pi t/12))> t=0..11" spellcheck="false">`;
   return `<div class="row"><span class="lbl">${label}</span><div><div class="modes" role="group" aria-label="${label}">${modes}</div>${body}</div></div>`;
 }
@@ -265,11 +266,19 @@ function update() {
 }
 
 // ── day-0 picture: starts, walls and one day of moves (function mode is evaluated here too) ──────────
+// as in Peener: a formula's values are rounded down to whole numbers unless ceil(…) or round(…) says otherwise
+const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
 function evalFn(src, t) {
-  const s = src.replace(/\s+/g, "").replace(/\*\*/g, "^").replace(/(\d)(t|pi|\()/g, "$1*$2").replace(/\)(\(|t|\d)/g, ")*$1").replace(/t\(/g, "t*(");
-  const toks = s.match(/\d+(?:\.\d+)?|[a-z]+|[-+*/^%(),]/gi) || [];
+  // tokens first, then the implied multiplications (2t, 2pi t, 8cos(…), 3(t+1), (t)(t), pi t), as Peener reads them
+  const raw = src.replace(/\*\*/g, "^").match(/\d+(?:\.\d+)?|[a-z]+|[-+*/^%(),]|\S/gi) || [];
+  const toks = [];
+  for (const k of raw) {
+    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi");
+    if (val && (/^[a-z]/i.test(k) || k === "(" || (/^\d/.test(k) && !/^\d/.test(p)))) toks.push("*");
+    toks.push(k);
+  }
   let i = 0;
-  const F = { round: Math.round, floor: Math.floor, ceil: Math.ceil, sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan, abs: Math.abs, min: Math.min, max: Math.max };
+  const F = { round: (v) => Math.round(v + EPS), floor: down, ceil: up, sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan, abs: Math.abs, min: Math.min, max: Math.max };
   const atom = () => {
     const k = toks[i++];
     if (k === undefined) throw 0;
@@ -290,7 +299,7 @@ function pointsOf(ps) {
   if (ps.mode === "points") { const out = []; const re = new RegExp(String.raw`(${NUM})\s*,\s*(${NUM})`, "g"); let m; while ((m = re.exec(ps.points))) out.push([eval1(m[1]), eval1(m[2])]); return out; }
   const out = [], a = Number(ps.from), b = Number(ps.to), st = Math.max(1, Number(ps.step) || 1);
   if (!Number.isFinite(a) || !Number.isFinite(b) || (b - a) / st > 4000) return null;
-  try { for (let t = a; t <= b; t += st) out.push([evalFn(ps.fx, t), evalFn(ps.fy, t)]); } catch { return null; }
+  try { for (let t = a; t <= b; t += st) out.push([down(evalFn(ps.fx, t)), down(evalFn(ps.fy, t))]); } catch { return null; }
   return out;
 }
 // formula walls are joined into solid lines, as Peener does
