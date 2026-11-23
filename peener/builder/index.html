@@ -125,6 +125,7 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
         <div class="acts">
           <button type="button" class="main" id="impReplace">Replace all</button>
           <button type="button" id="impAdd">Add to top</button>
+          <button type="button" id="impUndo" hidden>Undo</button>
           <button type="button" id="impCancel">Cancel</button>
         </div>
         <div class="err" id="impErr" hidden></div>
@@ -583,7 +584,7 @@ function parsePeener(src) {
   }
   return { items: out, warn };
 }
-const impShow = (on) => { $("impBox").hidden = !on; $("impBtn").setAttribute("aria-expanded", String(on)); if (on) { $("impErr").hidden = $("impNote").hidden = true; $("impCancel").textContent = "Cancel"; $("impText").focus(); } };
+const impShow = (on) => { $("impBox").hidden = !on; $("impBtn").setAttribute("aria-expanded", String(on)); if (on) { $("impErr").hidden = $("impNote").hidden = $("impUndo").hidden = true; $("impCancel").textContent = "Cancel"; $("impText").focus(); } };
 function doImport(replace) {
   let res;
   try { res = parsePeener($("impText").value); } catch (e) { $("impErr").textContent = e.message; $("impErr").hidden = false; $("impNote").hidden = true; return; }
@@ -609,6 +610,24 @@ $("copy").addEventListener("click", () => {
   try { navigator.clipboard.writeText(v).then(() => toast("Copied"), fb); } catch { fb(); }
 });
 render();
+// opened from Peener Sim (…/builder/#in=<its input>): load that input as cards; Undo brings back the cards from before
+let undoItems = null;
+function fromPeener() {
+  const m = /^#in=(.*)$/s.exec(location.hash); if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);   // a reload doesn't load it again
+  let txt; try { txt = decodeURIComponent(m[1]).trim(); } catch { return; }
+  if (!txt) return;
+  impShow(true); $("impText").value = txt;
+  let res; try { res = parsePeener(txt); } catch (e) { $("impErr").textContent = e.message; $("impErr").hidden = false; return; }
+  if (!res.items.length) return;
+  undoItems = items; items = res.items; render();
+  const nw = res.items.filter((x) => x.kind === "ween").length, nl = res.items.length - nw;
+  $("impNote").textContent = `Loaded from Peener Sim: ${nw} ween${nw === 1 ? "" : "s"}${nl ? ` and ${nl} wall${nl === 1 ? "" : "s"}` : ""}.`
+    + (res.warn.length ? ` Not imported: ${res.warn.join(" ")}` : "") + " Undo brings back the cards you had before.";
+  $("impNote").hidden = false; $("impUndo").hidden = false; $("impCancel").textContent = "Close";
+}
+fromPeener(); addEventListener("hashchange", fromPeener);   // also when the builder is already open
+$("impUndo").addEventListener("click", () => { if (undoItems) { items = undoItems; undoItems = null; render(); toast("Your previous cards are back"); } impShow(false); });
 </script>
 </body>
 </html>

@@ -2973,6 +2973,9 @@ function inputFromLink() {
   try { $("inp").value = decodeURIComponent(m[1]); return true; } catch { return false; }
 }
 inputFromLink();
+// the "Ween builder" link carries what's typed in the line, so the builder opens with it as cards
+const builderLink = () => { const v = $("inp").value.trim(); $("openB").href = v ? "builder/#in=" + encodeURIComponent(v) : "builder/"; };
+$("openB").addEventListener("click", builderLink); $("openB").addEventListener("pointerdown", builderLink); $("openB").addEventListener("focus", builderLink);
 addEventListener("hashchange", () => { if (inputFromLink()) { clearTimeout(timer); run(); } });
 $("legendMore").addEventListener("click", () => { const L = $("legend"), open = L.classList.toggle("open"); $("legendMore").textContent = open ? "Show less" : "Read more"; });
 buildArt();
