@@ -85,6 +85,8 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
 .acts a.btn:hover { background: var(--red-deep); }
 #prev { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; background: #fffdf8; border: 1px solid var(--rule); }
 .note { font-size: 15px; color: var(--ink-2); font-style: italic; }
+#impBox { margin-bottom: 14px; }
+#impText { width: 100%; min-height: 110px; resize: vertical; font: 15px/1.45 var(--mono); }
 #toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 14px; font-style: italic; }
 </style>
 </head>
@@ -112,7 +114,20 @@ aside { position: sticky; top: 10px; display: grid; gap: 14px; }
           <option value="ripples">Lifespan: ripples</option>
           <option value="lid">Lifespan: a box whose lid vanishes</option>
         </select>
+        <button type="button" id="impBtn" aria-expanded="false" aria-controls="impBox">Import…</button>
         <button type="button" id="clearAll" style="margin-left:auto">Clear all</button>
+      </div>
+      <div class="panel" id="impBox" hidden>
+        <h3>Import</h3>
+        <div class="note">Paste anything Peener Sim accepts: each ween and wall becomes a card you can edit.</div>
+        <textarea id="impText" spellcheck="false" aria-label="Peener text to import" placeholder="{[0,0] : [1,0] [0,1] [-1,-1] ; color #2f6fd6 ; lifespan 10}  wall{<t, 12> t=-12..12}"></textarea>
+        <div class="acts">
+          <button type="button" class="main" id="impReplace">Replace all</button>
+          <button type="button" id="impAdd">Add to top</button>
+          <button type="button" id="impCancel">Cancel</button>
+        </div>
+        <div class="err" id="impErr" hidden></div>
+        <div class="note" id="impNote" hidden></div>
       </div>
       <div id="items"></div>
     </main>
@@ -422,6 +437,135 @@ $("preset").addEventListener("change", () => {
     newWeen(0, { starts: FN("t", "12", -12, 12), moves: P(""), wall: true, color: WALLWEEN, useLife: true, life: 15 }), newWeen(1)];
   if (v) render();
 });
+// ── import: Peener text → cards ───────────────────────────────────────────────────────────────────
+// Read the way Peener reads it: wall{points ; color X} is a plain wall; {starts : moves ; options} is a ween (no colon:
+// no moves); whatever is outside braces is a pattern growing from (0,0), and Peener counts it as ween 1.
+// A set of points becomes Points when it is just x,y pairs, Function when it is one <x, y> t=a..b formula in t,
+// and Text otherwise, so nothing Peener accepts is lost.
+const ccx = document.createElement("canvas").getContext("2d");
+function toHex(v) {
+  v = v.trim();
+  if (/^#[0-9a-f]{6}$/i.test(v)) return v.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(v)) return ("#" + [...v.slice(1)].map((c) => c + c).join("")).toLowerCase();
+  ccx.fillStyle = "#010203"; ccx.fillStyle = v; const c = ccx.fillStyle;   // named and rgb(…) colours, as Peener reads them
+  if (c === "#010203" && !/^#?010203$/i.test(v)) return null;
+  if (c[0] === "#") return c.toLowerCase();
+  const m = c.match(/[\d.]+/g); return m ? "#" + m.slice(0, 3).map((x) => Math.round(Number(x)).toString(16).padStart(2, "0")).join("") : null;
+}
+// a grid like 00001,00000,01W00, as Peener spots one
+function isGrid(t) {
+  if (!/^[01W#.xXoO*@\n,\/|\s]+$/.test(t)) return false;
+  const rows = t.split(/[\n,\/|]+/).map((s) => s.replace(/\s+/g, "")).filter(Boolean);
+  return /[W#.xXoO*@]/.test(t) || (rows.length >= 3 && rows.every((s) => /^[01]+$/.test(s) && s.length === rows[0].length && s.length >= 3));
+}
+// one coordinate per point (0 1 5, or a formula <t^2>): such a pattern has to grow from 0, not [0,0]
+function oneD(t) {
+  if (isGrid(t)) return false;
+  if (/</.test(t)) { const b = [...t.matchAll(/<([^<>]*)>/g)].map((m) => m[1]); return b.length > 0 && b.every((x) => !splitTop(x, ",")); }
+  if (/[(\[]/.test(t)) { const g = [...t.matchAll(/[(\[]([^)\]]*)[)\]]/g)].map((m) => m[1].split(/[\s,;]+/).filter(Boolean)); return g.length > 0 && g.every((x) => x.length === 1); }
+  return /\d/.test(t) && !t.includes(",");
+}
+// x,y pairs as Peener reads them ((x,y), [x,y] or x,y; fractions fine), or null; a grid is left as text
+function pairsOf(t) {
+  if (isGrid(t)) return null;
+  let groups;
+  if (/[(\[]/.test(t)) {
+    if (t.replace(/[(\[][^)\]]*[)\]]/g, "").replace(/[\s,;]/g, "")) return null;
+    groups = [...t.matchAll(/[(\[]([^)\]]*)[)\]]/g)].map((m) => m[1].split(/[\s,;]+/).filter(Boolean));
+  } else {
+    const toks = t.replace(/\s*,\s*/g, ",").split(/[\s;]+/).filter(Boolean);
+    if (!toks.every((k) => k.includes(","))) return null;
+    groups = toks.map((k) => k.split(",").filter(Boolean));
+  }
+  const num = new RegExp(`^${NUM}$`);
+  if (!groups.length || groups.some((g) => g.length !== 2 || !g.every((s) => num.test(s)))) return null;
+  return groups.map((g) => g.join(","));
+}
+// split at the first `sep` outside (), [] and <>
+function splitTop(s, sep) {
+  let d = 0;
+  for (let i = 0; i < s.length; i++) { const c = s[i]; if ("([<".includes(c)) d++; else if (")]>".includes(c)) d--; else if (c === sep && d === 0) return [s.slice(0, i), s.slice(i + 1)]; }
+  return null;
+}
+const FN_NAMES = ["t", "pi", "round", "floor", "ceil", "sqrt", "sin", "cos", "tan", "abs", "min", "max"];
+function fnOf(t) {
+  const m = /^<([^<>]*)>\s*t\s*(?:=|\bin\b|\bfrom\b)\s*(-?\d+)\s*(?:\.\.|\bto\b)\s*(-?\d+)(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?$/i.exec(t);
+  if (!m) return null;
+  const xy = splitTop(m[1], ","); if (!xy || splitTop(xy[1], ",")) return null;
+  const fx = xy[0].trim(), fy = xy[1].trim(), a = Number(m[2]), b = Number(m[3]), st = Number(m[4] || 1);
+  if (!fx || !fy || !/^[\w\s+\-*/^%().,]*$/.test(fx + fy) || b < a || st < 1) return null;
+  if ((fx + " " + fy).match(/[a-z_]\w*/gi)?.some((w) => !FN_NAMES.includes(w.toLowerCase()))) return null;   // another variable: keep as text
+  return { ...pointSet("", [fx, fy, a, b]), step: st };
+}
+function setOf(text) {
+  const t = text.trim();
+  if (!t) return pointSet("");
+  const pairs = pairsOf(t); if (pairs) return pointSet(pairs.join(" "));
+  return fnOf(t) || { ...pointSet(""), mode: "text", text: t };
+}
+function parsePeener(src) {
+  const text = src.replace(/[−–—]/g, "-").replace(/[⟨〈]/g, "<").replace(/[⟩〉]/g, ">").replace(/…/g, "..");
+  const re = /\bwall\s*\{([^{}]*)\}|\{([^{}]*)\}/gi, out = [], warn = [];
+  const rest = text.replace(re, " ");
+  if (/[{}]/.test(rest)) throw new Error("Each { needs a matching }.");
+  const plain = rest.replace(/[\s,;]/g, "") ? rest.trim().replace(/^[\s,;]+|[\s,;]+$/g, "") : "";
+  let wn = plain ? 1 : 0, ln = 0, m;
+  if (plain) out.push(newWeen(0, { starts: oneD(plain) ? { ...pointSet(""), mode: "text", text: "0" } : pointSet("0,0"), moves: setOf(plain), useColor: false }));
+  re.lastIndex = 0;
+  while ((m = re.exec(text))) {
+    const parts = (m[1] ?? m[2]).split(/[;|]/), body = parts[0];
+    if (m[1] !== undefined) {   // a plain wall
+      const name = `Wall ${++ln}`, wall = newWall({ pts: setOf(body) });
+      if (!body.trim()) warn.push(`${name} has no points.`);
+      parts.slice(1).forEach((p) => {
+        if (!p.trim()) return;
+        const c = /^\s*colou?r\s*[:=]?\s*(.+?)\s*$/i.exec(p), hex = c && toHex(c[1]);
+        if (hex) wall.color = hex; else warn.push(c ? `${name}: "${c[1]}" is not a colour.` : `${name}: skipped "${p.trim()}".`);
+      });
+      out.push(wall); continue;
+    }
+    const name = `Ween ${wn + 1}`, o = { useColor: false };
+    parts.slice(1).forEach((p) => {
+      if (!p.trim()) return;
+      if (/^\s*wall\s*$/i.test(p)) { o.wall = true; return; }
+      if (/^\s*(ignores?\s+walls?|through\s+walls?|ghost)\s*$/i.test(p)) { o.blocked = false; return; }
+      let k;
+      if ((k = /^\s*(?:lifespan|life|lives)\s*[:=]?\s*(.+?)\s*(?:days?)?\s*$/i.exec(p))) {
+        const L = Number(k[1]); if (Number.isInteger(L) && L >= 1) { o.useLife = true; o.life = L; } else warn.push(`${name}: a lifespan must be a whole number of days, 1 or more; got "${k[1]}".`);
+      } else if ((k = /^\s*(?:day|start)\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
+        const d = Number(k[1]); if (Number.isInteger(d) && d >= 0) { o.useDay = d > 0; o.day = d; } else warn.push(`${name}: a start day must be a whole number, 0 or more; got "${k[1]}".`);
+      } else if ((k = /^\s*weight\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
+        const w = Number(k[1]); if (Number.isFinite(w)) { o.useWeight = w !== 1; o.weight = w; } else warn.push(`${name}: a weight must be a number; got "${k[1]}".`);
+      } else if ((k = /^\s*colou?r\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
+        const hex = toHex(k[1]); if (hex) { o.useColor = true; o.color = hex; } else warn.push(`${name}: "${k[1]}" is not a colour.`);
+      } else warn.push(`${name}: skipped "${p.trim()}".`);
+    });
+    const sm = splitTop(body, ":"), L = sm ? sm[0] : body, R = sm ? sm[1] : "";
+    if (!L.trim()) warn.push(`${name} has no starting points.`);
+    if (!o.useColor && o.wall) o.color = WALLWEEN;
+    out.push(newWeen(wn++, { starts: setOf(L), moves: setOf(R), ...o }));
+  }
+  return { items: out, warn };
+}
+const impShow = (on) => { $("impBox").hidden = !on; $("impBtn").setAttribute("aria-expanded", String(on)); if (on) { $("impErr").hidden = $("impNote").hidden = true; $("impCancel").textContent = "Cancel"; $("impText").focus(); } };
+function doImport(replace) {
+  let res;
+  try { res = parsePeener($("impText").value); } catch (e) { $("impErr").textContent = e.message; $("impErr").hidden = false; $("impNote").hidden = true; return; }
+  if (!res.items.length) { $("impErr").textContent = "Nothing to import. Paste weens like {[0,0] : [1,0] [0,1]} or walls like wall{<t, 10> t=-20..20}."; $("impErr").hidden = false; $("impNote").hidden = true; return; }
+  items = replace ? res.items : [...res.items, ...items];
+  render();
+  const nw = res.items.filter((x) => x.kind === "ween").length, nl = res.items.length - nw;
+  const said = `Imported ${nw} ween${nw === 1 ? "" : "s"}${nl ? ` and ${nl} wall${nl === 1 ? "" : "s"}` : ""}.`;
+  $("impErr").hidden = true;
+  if (res.warn.length) { $("impNote").textContent = `${said} Not imported: ${res.warn.join(" ")}`; $("impNote").hidden = false; $("impCancel").textContent = "Close"; }   // keep the box open so the notes can be read
+  else { impShow(false); toast(said); }
+  document.querySelector(".card")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+$("impBtn").addEventListener("click", () => impShow($("impBox").hidden));
+$("impCancel").addEventListener("click", () => impShow(false));
+$("impReplace").addEventListener("click", () => doImport(true));
+$("impAdd").addEventListener("click", () => doImport(false));
+$("impText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doImport(true); } else if (e.key === "Escape") impShow(false); });
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 1600); }
 $("copy").addEventListener("click", () => {
   const v = $("out").value;
