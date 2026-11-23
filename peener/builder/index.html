@@ -71,7 +71,8 @@ input[type=number] { width: 6.5em; }
 .check > label input { flex: none; }
 input[type=checkbox] { accent-color: var(--red); width: 20px; height: 20px; margin: 0; }
 input[type=color] { width: 42px; height: 32px; padding: 0 2px; border: 1px solid var(--rule); background: #fffdf8; cursor: pointer; }
-.hex { width: 7.5em !important; }
+.hex { width: 11em !important; }
+.note code { font: 13px var(--mono); background: var(--lav); padding: 0 4px; font-style: normal; }
 input[type=text].wt { width: 8em; }
 .err { color: var(--red-deep); font-size: 15px; font-style: italic; }
 .code { font: 14px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
@@ -271,7 +272,7 @@ function render() {
       body = pointsForm("starts", it.starts, "Starts at") + pointsForm("moves", it.moves, "Moves") +
         `<div class="row"><span class="lbl">Options</span><div class="checks">
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="text" class="wt" data-f="day" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} placeholder="0 or 3t" aria-label="Start day" spellcheck="false"><span class="note">a number, or a formula in t: each starting dot appears on its own day</span></div>
-          <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
+          <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}<span class="note">or a colour for each starting dot: with Starts at as a Function of t, type a formula like <code>hsl(30t, 80%, 50%)</code> in the box</span></div>
           <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="text" class="wt" data-f="weight" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} placeholder="2 or 2n+1" aria-label="Weight" spellcheck="false"><span class="note">a number, or a formula in n (the day)</span></div>
           <div class="check"><label><input type="checkbox" data-f="sumW" ${it.sumW ? "checked" : ""}> Add up weights: each dot weighs the sum of the dots that grew into it (the starting dots weigh the weight above)</label></div>
           <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="text" class="wt" data-f="life" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} placeholder="10 or n+1" aria-label="Lifespan in days" spellcheck="false"><span class="note">days: each dot vanishes that long after it appears (a formula in n: n is the day it appears)</span></div>
