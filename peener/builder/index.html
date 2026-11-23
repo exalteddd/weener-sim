@@ -164,7 +164,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 // a set of points is { mode: "points" | "fn" | "text", points, fx, fy, from, to, step, text }
 const pointSet = (points, fn) => ({ mode: fn ? "fn" : "points", points: points || "", fx: fn ? fn[0] : "t", fy: fn ? fn[1] : "0", from: fn ? fn[2] : -10, to: fn ? fn[3] : 10, step: 1, text: "" });
 const newWeen = (k, o = {}) => ({ kind: "ween", starts: pointSet("0,0"), moves: pointSet("1,0 0,1 -1,-1"),
-  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, useLife: false, life: 10, wall: false, blocked: true, ...o });
+  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, useLife: false, life: 10, sumW: false, wall: false, blocked: true, ...o });
 const newWall = (o = {}) => ({ kind: "wall", pts: pointSet("", ["t", "10", -20, 20]), color: WALL, ...o });
 let items = [];
 try { items = JSON.parse(localStorage.getItem("weenbuilder:v1") || "null") || []; } catch { items = []; }
@@ -234,6 +234,7 @@ function itemText(it) {
     else if (weightOk(l)) opts.push(`lifespan ${l}`);
     else return bad;
   }
+  if (it.sumW) opts.push("sum");   // each dot weighs the sum of the dots that grew into it
   if (it.wall) opts.push("wall");
   if (!it.blocked) opts.push("ignores walls");
   return { text: `{${s.text}${m.text ? " : " + m.text : ""}${opts.map((o) => " ; " + o).join("")}}`, err: "" };   // no moves: no colon
@@ -272,6 +273,7 @@ function render() {
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="text" class="wt" data-f="day" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} placeholder="0 or 3t" aria-label="Start day" spellcheck="false"><span class="note">a number, or a formula in t: each starting dot appears on its own day</span></div>
           <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
           <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="text" class="wt" data-f="weight" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} placeholder="2 or 2n+1" aria-label="Weight" spellcheck="false"><span class="note">a number, or a formula in n (the day)</span></div>
+          <div class="check"><label><input type="checkbox" data-f="sumW" ${it.sumW ? "checked" : ""}> Add up weights: each dot weighs the sum of the dots that grew into it (the starting dots weigh the weight above)</label></div>
           <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="text" class="wt" data-f="life" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} placeholder="10 or n+1" aria-label="Lifespan in days" spellcheck="false"><span class="note">days: each dot vanishes that long after it appears (a formula in n: n is the day it appears)</span></div>
           <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: no other ween, wall weens included, can land on or cross its dots</label></div>
           <div class="check"><label><input type="checkbox" data-f="blocked" ${it.blocked ? "checked" : ""}> Blocked by walls</label></div>
@@ -558,6 +560,7 @@ function parsePeener(src) {
     parts.slice(1).forEach((p) => {
       if (!p.trim()) return;
       if (/^\s*wall\s*$/i.test(p)) { o.wall = true; return; }
+      if (/^\s*(?:sum|summed|sum weights?|add(?:s)? up(?: weights?)?)\s*$/i.test(p)) { o.sumW = true; return; }
       if (/^\s*(ignores?\s+walls?|through\s+walls?|ghost)\s*$/i.test(p)) { o.blocked = false; return; }
       let k;
       if ((k = /^\s*(?:lifespan|life|lives)\s*[:=]?\s*(.+?)\s*(?:days?)?\s*$/i.exec(p))) {
