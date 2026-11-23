@@ -211,6 +211,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>{</code> starts <code>:</code> moves <code>;</code> options <code>}</code>: the colon splits where it starts from how it moves; each <code>;</code> adds an option (day, color, weight, wall, ignores walls, lifespan); no colon means no moves</li>
     <li><code>wall{&lt;t, 12&gt; t=-40..40 ; color #555}</code> a plain wall: it blocks weens but never grows and isn't counted; a one-variable formula is drawn as a solid line, so <code>wall{&lt;t, 3t&gt; t=-9..9}</code> has no gaps</li>
     <li><code>{[0,0] : [1,0] [0,1] ; ignores walls}</code> a ween that passes through every wall</li>
+    <li><code>{&lt;3k, 0&gt; k=1.. ; day 3k}</code> dots that keep appearing: one at (3k, 0) on day 3k for every k, forever (<code>k=1..</code> has no end; the day is a formula in k). Add moves to make each one grow: <code>{&lt;3k, 0&gt; k=1.. : [0,1] [0,-1] ; day 3k}</code></li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 10}</code> each dot of this ween vanishes 10 days after it appears, so it spreads as a band 10 days thick; it never grows back where it has been, and a wall ween's dots stop blocking once they vanish</li>
     <li class="exh">Weight and walls</li>
     <li>a cell's weight is the total weight of the weens that have reached it</li>
@@ -236,6 +237,8 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><button type="button" class="ex">{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan 4} {[0,0] : [1,0] [0,1] [-1,-1] ; day 10 ; lifespan 4 ; color blue} {[0,0] : [1,0] [0,1] [-1,-1] ; day 20 ; lifespan 4 ; color gold}</button> ripples: three weens 10 days apart, each dot lasting 4 days</li>
     <li><button type="button" class="ex">{[0,12] : [1,0] [-1,0] ; wall ; lifespan 6 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a wall ween whose dots last 6 days: a gap opens in its middle and the ween gets through</li>
     <li><button type="button" class="ex">wall{&lt;t, -12&gt; t=-12..12} wall{&lt;12, t&gt; t=-12..12} wall{&lt;-12, t&gt; t=-12..12} {&lt;t, 12&gt; t=-12..12 ; wall ; lifespan 15 ; color #56607a} {[0,0] : [1,0] [0,1] [-1,-1]}</button> a box whose lid (a wall ween) vanishes on day 15, letting the ween out</li>
+    <li><button type="button" class="ex">{&lt;3k, 0&gt; k=1.. ; day 3k}</button> a new dot every 3 days, forever: f(n) = ⌊n/3⌋</li>
+    <li><button type="button" class="ex">{&lt;3k, 0&gt; k=1.. : [0,1] [0,-1] ; day 3k}</button> a comb: every 3 days a new line starts growing up and down</li>
     <li><button type="button" class="ex">0 1 5</button> a line</li>
     <li><button type="button" class="ex">&lt;t, t^2&gt; t=-3..3</button> a parabola</li>
   </ul></details>
@@ -501,11 +504,14 @@ onmessage = (e) => {
 // several weens) and one for the union; only whole-number points are counted. W(n) adds up each ween's weight times
 // the number of points it holds, so a point held by two weens of weight 1 counts 2 there.
 function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity) {
-  let sx0 = Infinity, sx1 = -Infinity, sy0 = Infinity, sy1 = -Infinity, mx0 = 0, mx1 = 0, my0 = 0, my1 = 0;
-  for (const g of groups) {
-    for (const [x, y] of g.starts) { sx0 = Math.min(sx0, x); sx1 = Math.max(sx1, x); sy0 = Math.min(sy0, y); sy1 = Math.max(sy1, y); }
-    for (const [x, y] of g.moves) { mx0 = Math.min(mx0, x); mx1 = Math.max(mx1, x); my0 = Math.min(my0, y); my1 = Math.max(my1, y); }
-  }
+  let mx0 = 0, mx1 = 0, my0 = 0, my1 = 0;
+  for (const g of groups) for (const [x, y] of g.moves) { mx0 = Math.min(mx0, x); mx1 = Math.max(mx1, x); my0 = Math.min(my0, y); my1 = Math.max(my1, y); }
+  // the box round the starting dots present by day nc (a ween that spawns gives each dot its own day, sdays)
+  const sbox = (nc) => {
+    let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+    for (const g of groups) g.starts.forEach(([x, y], j) => { if (g.sdays && g.sdays[j] > nc && g.sdays[j] !== (g.day | 0)) return; a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); });
+    return [a, b, c, d];
+  };
   const NG = groups.length, day = groups.map((g) => g.day | 0), wt = groups.map((g) => (g.weight == null ? 1 : g.weight));
   // lifespan L: each dot of the ween vanishes L days after it appears, and the ween never grows back where it has been
   // (the lifespan can be a formula in n, the day the dot appears)
@@ -525,8 +531,8 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     return false;
   };
   const crossesWall = (b, gi, x, y) => { const p = paths[b][gi]; for (let k = 0; k < p.length; k += 2) if (heldWall(x + p[k], y + p[k + 1], b)) return true; return false; };
-  const maxStart = Math.max(0, ...day);
-  const lay = (nc) => ({ W: sx1 - sx0 + nc * (mx1 - mx0) + 1, H: sy1 - sy0 + nc * (my1 - my0) + 1, ox: -(sx0 + nc * mx0), oy: -(sy0 + nc * my0) });
+  const maxStart = groups.reduce((a, g, b) => Math.max(a, g.sdays && !g.spawnOpen ? g.sdays.reduce((x, y) => Math.max(x, y), 0) : day[b]), 0);
+  const lay = (nc) => { const [sx0, sx1, sy0, sy1] = sbox(nc); return { W: sx1 - sx0 + nc * (mx1 - mx0) + 1, H: sy1 - sy0 + nc * (my1 - my0) + 1, ox: -(sx0 + nc * mx0), oy: -(sy0 + nc * my0) }; };
   let lo = 1, hi = 1 << 30; while (lo < hi) { const m = Math.ceil((lo + hi) / 2); const L = lay(m); (NMAP * L.W * L.H <= maxBits) ? lo = m : hi = m - 1; }
   const nMax = lo;
   // a wall covers its whole 1×1 square, fractions included
@@ -587,13 +593,19 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
       if (!other && (maps[U][w] & m)) { maps[U][w] &= ~m; live--; }
     }
   };
-  const seed = (b) => {
-    const fr = [];
-    for (const [x, y] of groups[b].starts) {
-      if (!groups[b].ghost && wallIdx.length && heldWall(x, y, b)) continue;
-      if (mark(b, x, y)) { fr.push(x, y, day[b]); if (mortal[b]) today[b].push(x, y); if (x % q === 0 && y % q === 0) { held[b]++; if (mark(U, x, y)) cnt++; } }
+  // each ween's starting dots in the order they appear; seed(b, n) adds those due on day n to the ween's front
+  const sorder = groups.map((g) => { const o = g.starts.map((_, j) => j); if (g.sdays) o.sort((a, c) => g.sdays[a] - g.sdays[c]); return o; }), sptr = groups.map(() => 0);
+  const seed = (b, n) => {
+    const g = groups[b], o = sorder[b], fr = fronts[b];
+    while (sptr[b] < o.length) {
+      const j = o[sptr[b]], dd = g.sdays ? g.sdays[j] : day[b];
+      if (dd > n) break;
+      sptr[b]++;
+      if (dd < n) continue;
+      const [x, y] = g.starts[j];
+      if (!g.ghost && wallIdx.length && heldWall(x, y, b)) continue;
+      if (mark(b, x, y)) { fr.push(x, y, n); if (mortal[b]) today[b].push(x, y); if (x % q === 0 && y % q === 0) { held[b]++; if (mark(U, x, y)) cnt++; } }
     }
-    fronts[b] = fr;
   };
   // one day for one ween
   const step = (b, n) => {
@@ -609,8 +621,8 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     fronts[b] = nx;
   };
   const totalW = () => { let t = 0; for (let b = 0; b < NG; b++) t += wt[b] * held[b]; return t; };
-  for (const b of wallIdx) if (day[b] === 0) seed(b);
-  for (let b = 0; b < NG; b++) if (!isWall[b] && day[b] === 0) seed(b);
+  for (const b of wallIdx) seed(b, 0);
+  for (let b = 0; b < NG; b++) if (!isWall[b]) seed(b, 0);
   keepBorn(0);
   live = cnt;
   const f = [live], W = [totalW()];
@@ -628,9 +640,9 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     }
     // walls move first (and new walls appear) so the day's walls already stand when the other weens move
     for (const b of wallIdx) step(b, n);
-    for (const b of wallIdx) if (day[b] === n) seed(b);
+    for (const b of wallIdx) seed(b, n);
     for (let b = 0; b < NG; b++) if (!isWall[b]) step(b, n);
-    for (let b = 0; b < NG; b++) if (!isWall[b] && day[b] === n) seed(b);
+    for (let b = 0; b < NG; b++) if (!isWall[b]) seed(b, n);
     keepBorn(n);
     live += cnt; f.push(live); W.push(totalW());
     if (Hs) for (let b = 0; b < NG; b++) Hs[b].push(held[b]);
@@ -765,9 +777,16 @@ onmessage = (e) => {
   let mx = 0; for (const g of groups) for (const [x, y] of g.moves) mx = Math.max(mx, Math.abs(x), Math.abs(y));
   // painting in units of 1/q: x from −q·cx to q(N−1−cx), y from −q(M−1−cy) to q·cy
   let X0 = -q * cx, X1 = q * (N - 1 - cx), Y0 = -q * (M - 1 - cy), Y1 = q * cy;
-  for (const g of groups) for (const [x, y] of g.starts) { X0 = Math.min(X0, x); X1 = Math.max(X1, x); Y0 = Math.min(Y0, y); Y1 = Math.max(Y1, y); }
+  for (const g of groups) if (!g.sdays) for (const [x, y] of g.starts) { X0 = Math.min(X0, x); X1 = Math.max(X1, x); Y0 = Math.min(Y0, y); Y1 = Math.max(Y1, y); }
   const extra = walls.length ? q * Math.ceil(Math.max(N, M) / 2) : 0;
   const m = 4 * mx + 1 + extra, pad = Math.max(1, mx), o = m + pad, BW = X1 - X0 + 1 + 2 * o, BH = Y1 - Y0 + 1 + 2 * o;
+  // a ween that spawns dots over time: only the dots within the margin round the picture are searched
+  const sched = groups.map((g) => {
+    let S = g.starts, D = null;
+    if (g.sdays) { S = []; D = []; g.starts.forEach((p, j) => { if (p[0] >= X0 - m && p[0] <= X1 + m && p[1] >= Y0 - m && p[1] <= Y1 + m) { S.push(p); D.push(g.sdays[j]); } }); }
+    const ord = S.map((_, j) => j); if (D) ord.sort((a, c) => D[a] - D[c]);
+    return { S, D, ord, i: 0 };
+  });
   if (groups.length * BW * BH > 300e6) { postMessage({ error: "Points too far apart for this many dots; lower Dots across." }); return; }
   const idx = (x, y) => (Y1 - y + o) * BW + (x - X0 + o);
   const cellOf = (k) => {
@@ -812,15 +831,24 @@ onmessage = (e) => {
     if (holders[c]++ === 0 && !isWallCell[c]) live++;
   };
   const started = groups.map(() => false), fronts = groups.map(() => new Int32Array(0));
-  const seed = (b) => {
-    const fr = [];
-    for (const [x, y] of groups[b].starts) {
-      const k = idx(x, y);
-      if (!groups[b].ghost && wallIdx.some((w) => w !== b && vis[w][k] === 1)) continue;
+  // the starting dots due on day d join the ween's front
+  const seed = (b, d) => {
+    const sc = sched[b], g = groups[b], fr = [];
+    if (d < (g.day | 0)) return;
+    while (sc.i < sc.ord.length) {
+      const j = sc.ord[sc.i], dd = sc.D ? sc.D[j] : g.day | 0;
+      if (dd > d) break;
+      sc.i++;
+      if (dd < d) continue;
+      const k = idx(sc.S[j][0], sc.S[j][1]);
+      if (!g.ghost && wallIdx.some((w) => w !== b && vis[w][k] === 1)) continue;
       if (!vis[b][k]) { vis[b][k] = 1; fr.push(k); ev(k, b); }
     }
-    fronts[b] = Int32Array.from(fr); started[b] = true;
-    if (mortal[b] && fr.length) today[b].push(fronts[b]);
+    started[b] = true;
+    if (!fr.length) return;
+    const a = Int32Array.from(fr), F = fronts[b];
+    if (F.length) { const mm = new Int32Array(F.length + a.length); mm.set(F); mm.set(a, F.length); fronts[b] = mm; } else fronts[b] = a;
+    if (mortal[b]) today[b].push(a);
   };
   // ween b's dots due to vanish on day t go
   const vanish = (b, t) => {
@@ -857,9 +885,9 @@ onmessage = (e) => {
     fronts[b] = next.subarray(0, nl);
     if (mortal[b] && nl) today[b].push(fronts[b]);
   };
-  const maxStart = Math.max(0, ...groups.map((g) => g.day | 0));
-  groups.forEach((g, b) => { if (g.wall && (g.day | 0) === 0) seed(b); });
-  groups.forEach((g, b) => { if (!g.wall && (g.day | 0) === 0) seed(b); });
+  const maxStart = groups.reduce((a, g, b) => Math.max(a, sched[b].D ? sched[b].D.reduce((x, y) => Math.max(x, y), 0) : g.day | 0), 0);
+  groups.forEach((g, b) => { if (g.wall) seed(b, 0); });
+  groups.forEach((g, b) => { if (!g.wall) seed(b, 0); });
   const keepBorn = () => groups.forEach((g, b) => { if (mortal[b] && today[b].length) { const D = d + lifeOf[b](d), l = due[b].get(D); if (l) l.push(today[b]); else due[b].set(D, [today[b]]); today[b] = []; lastDeath = Math.max(lastDeath, D); } });
   let d = 0;
   keepBorn();
@@ -879,9 +907,9 @@ onmessage = (e) => {
     });
     // walls move first (and new walls appear) so the day's walls already stand when the other weens move
     groups.forEach((g, b) => { if (g.wall) step(b); });
-    groups.forEach((g, b) => { if (g.wall && !started[b] && (g.day | 0) === d) seed(b); });
+    groups.forEach((g, b) => { if (g.wall) seed(b, d); });
     groups.forEach((g, b) => { if (!g.wall) step(b); });
-    groups.forEach((g, b) => { if (!g.wall && !started[b] && (g.day | 0) === d) seed(b); });
+    groups.forEach((g, b) => { if (!g.wall) seed(b, d); });
     keepBorn();
     counts.push(eToday); lives.push(live);
     if (Date.now() - last > 120) flush(false);
@@ -1029,6 +1057,71 @@ function parse(text) {
   return { pts, dim };
 }
 
+// Starting dots that appear over time: {<3k, 0> k=1.. ; day 3k}. The dots come from <x, y> formulas whose ranges may
+// include one open range (k=1.., no end); the day formula, in the same variables, gives each dot its day. Both are
+// rounded down. An open range is followed until its days pass SPAWN_DAYS or SPAWN_MAX dots are made, and its days
+// must not go down as k grows.
+const SPAWN_DAYS = 4000, SPAWN_MAX = 60000;
+const OPEN_RANGE = /\b[a-zA-Z_]\w*\s*(?:=|\bin\b|\bfrom\b)\s*-?\d+\s*\.\.(?!\s*-?\d)/;
+function spawnList(src, dayExpr) {
+  let text = src.replace(/[−–—]/g, "-").replace(/[⟨〈]/g, "<").replace(/[⟩〉]/g, ">").replace(/…/g, "..");
+  const ranges = {}; let open = null;
+  text = text.replace(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*(-?\d+)\s*\.\.(?!\s*-?\d)(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g, (_, v, a, st) => {
+    if (open) throw new Error("A ween can have only one range that goes on forever (like k=1..).");
+    open = { v, a: Number(a), step: Number(st || 1) };
+    if (open.step < 1) throw new Error(`Step for ${v} must be at least 1.`);
+    return " ";
+  });
+  text = text.replace(/\b([a-zA-Z_]\w*)\s*(?:=|\bin\b|\bfrom\b)\s*\[?\s*(-?\d+)\s*(?:\.\.|\bto\b|:|,)\s*(-?\d+)\s*\]?(?:\s*(?:\bstep\b|\bby\b)\s*(\d+))?/g, (_, v, a, b, st) => {
+    a = Number(a); b = Number(b); const step = Number(st || 1);
+    if (step < 1) throw new Error(`Step for ${v} must be at least 1.`);
+    if (b < a) throw new Error(`Range for ${v} runs backwards (${a} to ${b}).`);
+    if ((b - a) / step > 5000) throw new Error(`Range for ${v} has too many values; keep it under 5000.`);
+    ranges[v] = []; for (let x = a; x <= b; x += step) ranges[v].push(x);
+    return " ";
+  });
+  const bodies = []; text = text.replace(/<([^<>]*)>/g, (_, b) => { bodies.push(b); return " "; });
+  if (!bodies.length || text.replace(/[\s,;]/g, "")) throw new Error("With a day for each starting dot, give the dots as a formula, like {<3k, 0> k=1.. ; day 3k}.");
+  const isOpen = (v) => open && open.v === v, known = (v) => FUNCS.includes(v) || v === "pi" || (v === "e" && !ranges.e && !isOpen("e"));
+  const varsOf = (t) => [...new Set((t.match(/[a-zA-Z_]\w*/g) || []).filter((v) => !known(v)))];
+  const used = varsOf(dayExpr + " " + bodies.join(" "));
+  for (const v of used) if (!ranges[v] && !isOpen(v)) throw new Error(`Give a range for ${v}, like ${v}=0..5, or ${v}=1.. to go on forever.`);
+  if (open && !varsOf(dayExpr).includes(open.v)) throw new Error(`The day has to grow with ${open.v}, like day 3${open.v}; otherwise every dot would appear at once.`);
+  const parts = bodies.map((b) => {
+    const p = []; let depth = 0, cur = "";
+    for (const ch of b) { if (ch === "(") depth++; if (ch === ")") depth--; if (ch === "," && depth === 0) { p.push(cur); cur = ""; } else cur += ch; }
+    p.push(cur);
+    if (p.length !== 2 || p.some((x) => !x.trim())) throw new Error(`Spawned dots need 2-D formulas <x, y>; got <${b}>.`);
+    return p;
+  });
+  const at = (env) => Object.entries(env).map(([k, v]) => `${k}=${v}`).join(", ");
+  const out = [];
+  const emit = (env) => { for (const [px, py] of parts) {
+    const x = down(evalExpr(px, env)), y = down(evalExpr(py, env)), d = down(evalExpr(dayExpr, env));
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(d)) throw new Error(`The starting dots can't be worked out at ${at(env)}.`);
+    if (d < 0) throw new Error(`The day ${dayExpr} is ${d} at ${at(env)}; days start at 0.`);
+    if (Math.abs(x) > 1e5 || Math.abs(y) > 1e5) throw new Error(`A starting dot passed 100000 at ${at(env)}.`);
+    out.push([x, y, d]);
+  } };
+  let combos = [{}];
+  for (const v of used) if (ranges[v]) { combos = combos.flatMap((e) => ranges[v].map((x) => ({ ...e, [v]: x }))); if (combos.length > 20000) throw new Error("The ranges make more than 20,000 dots a step; narrow them."); }
+  let horizon = Infinity;
+  if (!open) for (const env of combos) emit(env);
+  else for (let k = open.a, prev = -Infinity; ; k += open.step) {
+    const from = out.length;
+    for (const env of combos) emit({ ...env, [open.v]: k });
+    let lo = Infinity; for (let i = from; i < out.length; i++) lo = Math.min(lo, out[i][2]);
+    if (lo < prev) throw new Error(`The day must not go down as ${open.v} grows (day ${dayExpr}).`);
+    prev = lo;
+    // every dot up to the horizon is made: later k only bring later days
+    if (lo > SPAWN_DAYS) { horizon = SPAWN_DAYS; break; }
+    if (out.length > SPAWN_MAX) { horizon = lo - 1; break; }
+  }
+  const keep = out.filter((p) => p[2] <= horizon).sort((a, b) => a[2] - b[2]);
+  if (!keep.length) throw new Error("The starting formula gave no dots.");
+  return { pts: keep.map((p) => [p[0], p[1]]), days: keep.map((p) => p[2]), open: !!open, horizon };
+}
+
 // {starts : moves} groups: growth begins at the starting points (which are not moves) and uses only that
 // group's moves. Everything outside braces is the usual set: it starts at (0,0) and its points are the moves.
 // The day-n set is the union over groups of everything reachable from a start in at most n moves.
@@ -1044,6 +1137,7 @@ function parseInput(text) {
       const c = parseColour(m[1]); if (!c) throw new Error(`"${m[1]}" is not a colour. Try red, gold, #2f6fd6 or rgb(40,120,200).`); rgb = c;
     });
     if (!body.trim()) throw new Error("A wall needs points, like wall{<t, 10> t=-20..20}.");
+    if (OPEN_RANGE.test(body)) throw new Error("A wall can't go on forever; give its range an end, like t=-20..20.");
     const w = parse(body.trim());
     if (w.dim !== 2) throw new Error("Walls need 2-D points x,y.");
     if (oneVarFormula(body)) w.pts = joinLine(w.pts);
@@ -1073,8 +1167,9 @@ function parseInput(text) {
       const key = m[1].toLowerCase(), val = m[2];
       if (key === "day" || key === "start") {
         const d = Number(val);
-        if (!Number.isInteger(d) || d < 0 || d > 100000) throw new Error(`A ween's day must be a whole number from 0 to 100000; got "${val}".`);
-        opt.day = d;
+        if (Number.isInteger(d) && d >= 0 && d <= 100000) opt.day = d;
+        else if (!Number.isFinite(d) && /[a-z]/i.test(val)) opt.dayExpr = val.trim();   // a day for each starting dot, like day 3k
+        else throw new Error(`A ween's day must be a whole number from 0 to 100000, or a formula in its starting dots' variable, like day 3k; got "${val}".`);
       } else if (key === "weight") {
         const w = parseWeight(val);
         if (typeof w === "number") opt.weight = w; else opt.wexpr = w.expr;
@@ -1088,8 +1183,17 @@ function parseInput(text) {
     const k = body.indexOf(":");
     const L = (k < 0 ? body : body.slice(0, k)).trim(), R = k < 0 ? "" : body.slice(k + 1).trim();
     if (!L) throw new Error("A group needs at least one starting point before the colon.");
-    const st = parse(L); setDim(st.dim);
-    if (opt.wall && st.dim === 2 && oneVarFormula(L)) st.pts = joinLine(st.pts);   // a wall ween drawn as a curve is joined up too
+    if (OPEN_RANGE.test(R)) throw new Error("Only a ween's starting dots can go on forever (k=1..); its moves need an end, like k=1..5.");
+    let st;
+    if (opt.dayExpr || OPEN_RANGE.test(L)) {   // starting dots that appear over time
+      if (!opt.dayExpr) throw new Error("Starting dots that go on forever need a day for each, like {<3k, 0> k=1.. ; day 3k}.");
+      const sp = spawnList(L, opt.dayExpr);
+      st = { pts: sp.pts, dim: 2 }; setDim(2);
+      Object.assign(opt, { sdays: sp.days, day: sp.days[0], spawnOpen: sp.open, horizon: sp.horizon });
+    } else {
+      st = parse(L); setDim(st.dim);
+      if (opt.wall && st.dim === 2 && oneVarFormula(L)) st.pts = joinLine(st.pts);   // a wall ween drawn as a curve is joined up too
+    }
     let mv = { pts: [] }; if (R) { mv = parse(R); setDim(mv.dim); }
     groups.push({ starts: st.pts, moves: mv.pts, ...opt });
     return " ";
@@ -1526,7 +1630,7 @@ function startReach() {
   };
   const GR = geoNow.general ? geoNow.groups : [{ starts: [[0, 0]], moves: geoNow.pts.filter((p) => p[0] || p[1]), day: 0, weight: 1, rgb: PALETTE[0], plain: true }];
   forGroups = GR; forSimple = GR.length === 1 && GR[0].plain;
-  gworker.postMessage({ groups: GR.map(({ starts, moves, day, wall, ghost, life, lifeExpr }) => ({ starts, moves, day, wall, ghost, life, lifeExpr })), N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q, walls: wallCells(pic) });
+  gworker.postMessage({ groups: GR.map(({ starts, sdays, moves, day, wall, ghost, life, lifeExpr }) => ({ starts, sdays, moves, day, wall, ghost, life, lifeExpr })), N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q, walls: wallCells(pic) });
 }
 const REDS = [[224, 53, 43], [240, 74, 53], [201, 42, 34], [255, 95, 69]], JIT = [1, 1.07, 0.9, 1.14];
 let forGroups = null, forSimple = true;
@@ -1689,7 +1793,7 @@ function legend(geo) {
   const G = geo && geo.general ? geo.groups : null;
   if ((!G || (G.length === 1 && G[0].plain && !G[0].day)) && !textWallGroups.length) { $("legend").innerHTML = ""; $("legendMore").hidden = true; return; }
   if (!G) { $("legend").innerHTML = textWallGroups.map((w) => `<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dots</span>`).join(""); foldLegend(); return; }
-  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.lifeExpr ? ` · dots last ${g.lifeExpr.replace(/\s+/g, " ")} days` : g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${wText(g)}</span>`);
+  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""}${g.sdays ? ` · dots appear on day ${g.dayExpr}${g.spawnOpen ? ", forever" : ""}` : ` · day ${g.day}`}${g.lifeExpr ? ` · dots last ${g.lifeExpr.replace(/\s+/g, " ")} days` : g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${wText(g)}</span>`);
   for (const w of textWallGroups) items.push(`<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dot${w.pts.length === 1 ? "" : "s"}</span>`);
   $("legend").innerHTML = items.join("");
   foldLegend();
@@ -2529,10 +2633,17 @@ function run() {
       const o = scale(groups[0].moves).filter((p) => p[0] !== 0 || p[1] !== 0);
       geo = geometry([[0, 0], ...o], dim); geo.q = q;
     } else {
-      const G = groups.map((g, k) => ({ starts: scale(g.starts), moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight, wexpr: g.wexpr || null,
-        rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, lifeExpr: g.lifeExpr || null, plain: !g.wall && !g.ghost && !g.life && !g.lifeExpr && !g.color && !g.wexpr && (g.weight == null || g.weight === 1) }));
-      const r = Math.max(0, ...G.map((g) => geometry([[0, 0], ...g.moves], dim).r));
-      geo = { general: true, groups: G, r, q, k: G.reduce((a, g) => a + g.starts.length + g.moves.length, 0), walled,
+      // spawned dots keep their days (a dot that comes back later changes nothing, so the first day is kept)
+      const scaleDays = (P, D) => { const mp = new Map(); P.forEach((p, i) => { const sp = p.map((v) => Math.round(v * q)), key = sp + ""; if (!mp.has(key)) mp.set(key, [sp, D[i]]); }); const v = [...mp.values()]; return [v.map((e) => e[0]), v.map((e) => e[1])]; };
+      const G = groups.map((g, k) => ({ ...(g.sdays ? (([S, D]) => ({ starts: S, sdays: D }))(scaleDays(g.starts, g.sdays)) : { starts: scale(g.starts), sdays: null }),
+        spawnOpen: !!g.spawnOpen, dayExpr: g.dayExpr || null, horizon: g.horizon,
+        moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight, wexpr: g.wexpr || null,
+        rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, lifeExpr: g.lifeExpr || null, plain: !g.wall && !g.ghost && !g.life && !g.lifeExpr && !g.color && !g.wexpr && !g.sdays && (g.weight == null || g.weight === 1) }));
+      // dots that keep appearing add to the growth: count with room for two more degrees, and fit whatever degree it is
+      const spawn = G.some((g) => g.spawnOpen);
+      const r = Math.max(0, ...G.map((g) => geometry([[0, 0], ...g.moves], dim).r)) + (spawn ? 2 : 0);
+      geo = { general: true, groups: G, r, q, k: G.reduce((a, g) => a + g.starts.length + g.moves.length, 0), walled, spawn,
+        horizon: Math.min(MAXDAY, ...G.filter((g) => g.spawnOpen).map((g) => g.horizon)),
         weighted: G.length > 1 || G.some((g) => g.weight !== 1 || g.wexpr) };
     }
     if (q > 1) { const fq = (n) => { const g = gcd(n, q); return g === q ? String(n / q) : `${n / g}/${q / g}`; }; geo.fmt = (p) => (dim === 1 ? fq(p[0]) : `(${fq(p[0])},${fq(p[1])})`); }
@@ -2550,7 +2661,7 @@ function run() {
   // a weight formula: W(n) = sum over weens of w(n) times the dots that ween holds on day n
   const weigh = (W, H) => (H ? H[0].map((_, n) => geo.groups.reduce((s, g, b) => s + weightOn(g, n) * H[b][n], 0)) : W);
   worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, weigh(e.data.W, e.data.H), e.data.H); };
-  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life, lifeExpr, wexpr }) => ({ starts, moves, day, weight, wall, ghost, life, lifeExpr, vary: !!wexpr })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
+  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, sdays, spawnOpen, moves, day, weight, wall, ghost, life, lifeExpr, wexpr }) => ({ starts, sdays, spawnOpen, moves, day, weight, wall, ghost, life, lifeExpr, vary: !!wexpr })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: geo.spawn ? geo.horizon : MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
   else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY, limit: LIMIT });
 }
 // With fractions, f(n) counts the sums that land on whole-number points. It is a polynomial on each residue
@@ -2681,7 +2792,10 @@ function show(geo, f, reason, provisional, W, H) {
       : `<span class="wnote">total weight W(n): no formula over the days counted; its values are in the W(n) row below</span>`;
   }
   f = f || [];
-  const ok = reason === "exact" || reason === "stable", an = !f.length ? { N: -1, text: null } : geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
+  // endless spawning can raise the degree past 2: fit it like W(n), any degree and period
+  const fitAn = () => { const w = fitW(f, geo.q || 1); return w && { r: w.D, N: f.length - 1, n0: w.n0, q: w.p, text: w.text, p: w.at }; };
+  let ok = reason === "exact" || reason === "stable", an = !f.length ? { N: -1, text: null } : geo.spawn ? fitAn() : geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
+  if (!an) { an = { N: f.length - 1, text: null }; ok = false; }
   exactF = f; exactAn = ok ? an : null; setDay(cur);
   const allSame = an.text && an.text.every((t) => t === an.text[0]);
   $("poly").innerHTML = mathLines(!ok ? "f(n) = not settled" : !an.text ? `f(n) = ${poly(an)}` : allSame ? `f(n) = ${an.text[0]}`
