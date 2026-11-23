@@ -2784,7 +2784,7 @@ function show(geo, f, reason, provisional, W, H) {
         const we = g.wexpr && g.wexpr.trim().replace(/\s+/g, " ");
         const w = we ? (/^[\w.]+$/.test(we) || /^[a-z]\w*\s*\([^()]*\)$/i.test(we) ? we : `(${we})`) : g.weight === 1 ? "" : String(+g.weight.toFixed(6));
         const hp = h[0].length > 1 && /[+−-]/.test(h[0]) ? `(${h[0]})` : h[0];
-        return w === "" ? hp : w + (hp[0] === "(" || w.endsWith(")") ? "" : "·") + hp;
+        return w === "" ? hp : hp === "1" ? w : w + (hp[0] === "(" ? "" : "·") + hp;   // weight × dots; × 1 is just the weight
       });
       if (!terms.includes(null)) text = terms.filter(Boolean).join(" + ").replace(/\+ [−-]/g, "− ") || "0";
     }
