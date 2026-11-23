@@ -224,7 +224,7 @@ function render() {
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="number" data-f="day" min="0" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} aria-label="Start day"></div>
           <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
           <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="number" data-f="weight" step="any" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} aria-label="Weight"></div>
-          <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: other weens can't land on or cross its dots</label></div>
+          <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: no other ween, wall weens included, can land on or cross its dots</label></div>
           <div class="check"><label><input type="checkbox" data-f="blocked" ${it.blocked ? "checked" : ""}> Blocked by walls</label></div>
         </div></div>`;
     }
@@ -286,6 +286,19 @@ function pointsOf(ps) {
   try { for (let t = a; t <= b; t += st) out.push([evalFn(ps.fx, t), evalFn(ps.fy, t)]); } catch { return null; }
   return out;
 }
+// formula walls are joined into solid lines, as Peener does
+function joinLine(pts) {
+  const out = [];
+  pts.forEach((p, i) => {
+    if (!i) { out.push(p); return; }
+    let [x0, y0] = pts[i - 1]; const [x1, y1] = p, dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+    if (Math.max(dx, -dy) > 400) { out.push(p); return; }
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy;
+    while (x0 !== x1 || y0 !== y1) { const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } out.push([x0, y0]); }
+  });
+  return out;
+}
+const solid = (ps, P) => (P && ps.mode === "fn" ? joinLine(P.map(([x, y]) => [Math.round(x), Math.round(y)])) : P);
 function eval1(s) { const [p, q] = s.split("/"); return Number(p) / (q ? Number(q) : 1); }
 const niceStep = (span, target = 8) => { const raw = span / target, e = 10 ** Math.floor(Math.log10(raw)); for (const m of [1, 2, 5, 10]) if (m * e >= raw) return m * e; return 10 * e; };
 const startDay = (it) => (it.useDay ? Math.max(0, Math.round(Number(it.day) || 0)) : 0);
@@ -296,8 +309,8 @@ function preview() {
   const draw = [], walls = [];
   let wn = 0, skipped = 0, later = 0;
   for (const it of items) {
-    if (it.kind === "wall") { const P = pointsOf(it.pts); if (P) walls.push({ P, color: hexOk(it.color) ? it.color : WALL }); else skipped++; continue; }
-    const S = pointsOf(it.starts), M = pointsOf(it.moves), col = it.useColor && hexOk(it.color) ? it.color : PALETTE[wn % PALETTE.length]; wn++;
+    if (it.kind === "wall") { const P = solid(it.pts, pointsOf(it.pts)); if (P) walls.push({ P, color: hexOk(it.color) ? it.color : WALL }); else skipped++; continue; }
+    const S = it.wall ? solid(it.starts, pointsOf(it.starts)) : pointsOf(it.starts), M = pointsOf(it.moves), col = it.useColor && hexOk(it.color) ? it.color : PALETTE[wn % PALETTE.length]; wn++;
     if (!S) { skipped++; continue; }
     const day = startDay(it); if (day > 0) later++;
     draw.push({ S, M: M || [], col: it.wall ? (it.useColor && hexOk(it.color) ? it.color : WALLWEEN) : col, wall: it.wall, day });
