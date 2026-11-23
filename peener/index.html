@@ -112,6 +112,10 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
 #poly { font: 400 29px/1.2 var(--serif); font-variant-numeric: lining-nums; text-align: center; max-width: 100%; overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: .15em 0; scrollbar-width: none; }
 #poly::-webkit-scrollbar { display: none; }
 #poly i { font-style: italic; } #poly sup { font-size: .6em; vertical-align: .9em; line-height: 0; }
+#wpoly { font: 400 22px/1.25 var(--serif); font-variant-numeric: lining-nums; text-align: center; max-width: 100%; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; padding-bottom: .1em; }
+#wpoly::-webkit-scrollbar { display: none; }
+#wpoly i { font-style: italic; } #wpoly sup { font-size: .6em; vertical-align: .9em; line-height: 0; }
+#wpoly .wnote { font-size: 16px; font-style: italic; color: var(--ink-2); margin-left: .6em; }
 .fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 .12em; line-height: 1.05; }
 .fr > span:first-child { border-bottom: 1.5px solid currentColor; padding: 0 .1em .04em; }
 .fr > span:last-child { padding-top: .04em; }
@@ -152,6 +156,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
      and the painting's box takes the painting's own shape instead of 60% of the screen height */
   #head { flex-wrap: wrap; row-gap: 4px; } #title { flex: 1 0 100%; } #openB { margin-left: auto; }   /* the two links share a row under the title */
   #poly { white-space: normal; overflow: visible; line-height: 1.55; }
+  #wpoly { white-space: normal; overflow: visible; font-size: 18px; line-height: 1.5; }
   #fnmeta { flex-wrap: wrap; justify-content: center; text-align: center; gap: 2px 12px; } #fnmeta .vr { display: none; } #stab { white-space: nowrap; }
   body { grid-template-rows: auto auto auto auto auto auto auto auto; }
   #stage { height: auto; min-height: 0; aspect-ratio: var(--ar, 4 / 3); }
@@ -198,7 +203,8 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>&lt;t, t/2&gt; t=0..5</code> a formula's values are rounded down to whole numbers (2.5 → 2, −2.5 → −3); write <code>ceil(t/2)</code> to round up or <code>round(t/2)</code> for the nearest</li>
     <li><code>{[0,1] [0,2] : [1,1] [1,2]}</code> a ween: start at [0,1] and [0,2], move only by [1,1] and [1,2]; several weens combine</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; day 5 ; color blue ; weight 2}</code> a ween that starts on day 5, drawn blue, weighing 2</li>
-    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; weight n}</code> a weight can be a formula in n, the day: on day n each of its dots weighs n (also <code>2n+1</code>, <code>n^2/2</code>, <code>1/(n+1)</code>; not rounded)</li>
+    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; weight n}</code> a weight can be a formula in n, the day: on day n each of its dots weighs n (also <code>2n+1</code>, <code>n^2/2</code>, <code>1/(n+1)</code>; not rounded); W(n), the total weight, gets its own formula under f(n)</li>
+    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan n+1}</code> a lifespan can be a formula in n too: a dot that appears on day n lasts n+1 days (rounded down, at least 1)</li>
     <li><code>{[0,10] : [1,0] [-1,0] ; wall}</code> a wall ween: no other ween, wall weens included, can land on or cross its dots; this one grows sideways</li>
     <li class="exh">How a ween is written</li>
     <li><code>{</code> starts <code>:</code> moves <code>;</code> options <code>}</code>: the colon splits where it starts from how it moves; each <code>;</code> adds an option (day, color, weight, wall, ignores walls, lifespan); no colon means no moves</li>
@@ -255,7 +261,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
   <span class="grp" id="wallG"><label title="Drag on the painting to draw walls. No move can land on, jump over or squeeze past a wall. Hold Shift (or drag with the right button) to erase."><input type="checkbox" id="wallMode"> Paint walls</label><select id="brush" aria-label="Brush size"><option value="0" selected>1 dot</option><option value="1">3 dots</option><option value="3">7 dots</option></select><button type="button" id="wallClear">Clear walls</button></span>
   <span id="unitL"><span class="dot"></span><span id="unit"></span><span id="legendBox"><span id="legend"></span><button type="button" id="legendMore" hidden>Read more</button></span></span>
 </div>
-<div id="fn"><div id="poly">…</div><div id="fnmeta"><span id="stab"></span><span class="vr"></span><span id="meth"></span></div></div>
+<div id="fn"><div id="poly">…</div><div id="wpoly" hidden></div><div id="fnmeta"><span id="stab"></span><span class="vr"></span><span id="meth"></span></div></div>
 <div id="facts">…</div>
 
 <script id="wsrc" type="text/plain">
@@ -501,8 +507,9 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
   }
   const NG = groups.length, day = groups.map((g) => g.day | 0), wt = groups.map((g) => (g.weight == null ? 1 : g.weight));
   // lifespan L: each dot of the ween vanishes L days after it appears, and the ween never grows back where it has been
-  const life = groups.map((g) => (g.life > 0 ? g.life : Infinity)), mortal = life.map(Number.isFinite), anyMortal = mortal.some(Boolean);
-  const maxDeath = Math.max(0, ...groups.map((g, b) => (mortal[b] ? day[b] + life[b] : 0)));
+  // (the lifespan can be a formula in n, the day the dot appears)
+  const lifeOf = groups.map(lifeFor), mortal = groups.map((g) => g.life > 0 || !!g.lifeExpr), anyMortal = mortal.some(Boolean);
+  const maxDeath = Math.max(0, ...groups.map((g, b) => (mortal[b] ? day[b] + lifeOf[b](day[b]) : 0)));
   // bitmaps: one per ween (every point it has reached), the union of living dots, then one per ween for its vanished dots
   const GONE = NG + 1, NMAP = NG + 1 + (anyMortal ? NG : 0);
   const blk = makeBlocker(walls, groups.map((g) => g.moves), q);
@@ -559,11 +566,13 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
   const pending = groups.map(() => []), pendKeys = groups.map(() => new Set());
   const addPending = (b, x, y, t) => { const k = x + "," + y; if (!pendKeys[b].has(k)) { pendKeys[b].add(k); pending[b].push(x, y, t); } };
   const wallPts = new Set(); for (let k = 0; k < WP.length; k += 2) wallPts.add(WP[k] + "," + WP[k + 1]);
-  const born = groups.map(() => new Map()), today = groups.map(() => []);   // a mortal ween's dots by the day they appeared
-  const keepBorn = (n) => { for (let b = 0; b < NG; b++) if (mortal[b]) { if (today[b].length) born[b].set(n, today[b]); today[b] = []; } };
-  // the dots ween b grew on day t vanish; each leaves the count unless another ween's living dot is on the same point
+  // a mortal ween's dots, filed under the day they vanish (the day they appeared plus that day's lifespan)
+  const due = groups.map(() => new Map()), today = groups.map(() => []);
+  const keepBorn = (n) => { for (let b = 0; b < NG; b++) if (mortal[b]) { if (today[b].length) { const D = n + lifeOf[b](n), l = due[b].get(D); if (l) l.push(today[b]); else due[b].set(D, [today[b]]); } today[b] = []; } };
+  // ween b's dots due to vanish on day t go; each leaves the count unless another ween's living dot is on the same point
   const vanish = (b, t) => {
-    const pts = born[b].get(t); if (!pts) return; born[b].delete(t);
+    const lists = due[b].get(t); if (!lists) return; due[b].delete(t);
+    const pts = lists.length === 1 ? lists[0] : [].concat(...lists);
     const G = maps[GONE + b];
     if (isWall[b]) wallGone = true;
     for (let i = 0; i < pts.length; i += 2) {
@@ -610,11 +619,11 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
   for (let n = 1; ; n++) {
     if (n > cap) { if (cap >= nMax) { reason = "budget"; break; } grow(Math.min(nMax, Math.max(n, Math.ceil(cap * 1.42)))); }
     cnt = 0; wallGone = false;
-    for (let b = 0; b < NG; b++) if (mortal[b]) vanish(b, n - life[b]);   // dots whose lifespan is up go first
+    for (let b = 0; b < NG; b++) if (mortal[b]) vanish(b, n);   // dots whose lifespan is up go first
     // a wall dot went: blocked moves get another try, from dots that were still alive yesterday
     if (wallGone) for (let b = 0; b < NG; b++) if (pending[b].length) {
       const Pd = pending[b]; pending[b] = []; pendKeys[b].clear();
-      for (let i = 0; i < Pd.length; i += 3) if (Pd[i + 2] >= n - life[b]) fronts[b].push(Pd[i], Pd[i + 1], Pd[i + 2]);
+      for (let i = 0; i < Pd.length; i += 3) if (Pd[i + 2] + lifeOf[b](Pd[i + 2]) >= n) fronts[b].push(Pd[i], Pd[i + 1], Pd[i + 2]);
     }
     // walls move first (and new walls appear) so the day's walls already stand when the other weens move
     for (const b of wallIdx) step(b, n);
@@ -785,11 +794,11 @@ onmessage = (e) => {
   const pathOffs = groups.map((g) => g.moves.map(([a, c]) => { const p = pathSquares(a, c), o2 = []; for (let k = 0; k < p.length; k += 2) o2.push(p[k] - p[k + 1] * BW); return Int32Array.from(o2); }));
   // lifespan L: each dot of the ween vanishes L days after it appears (a vanished dot is marked 3, so it is never regrown
   // and no longer blocks); the ween never grows back where it has been
-  const life = groups.map((g) => (g.life > 0 ? g.life : Infinity)), mortal = life.map(Number.isFinite);
+  const lifeOf = groups.map(lifeFor), mortal = groups.map((g) => g.life > 0 || !!g.lifeExpr);
   const crossesWall = (b, g, base) => { const p = pathOffs[b][g]; for (let k = 0; k < p.length; k++) { const t = base + p[k]; for (const w of wallIdx) if (w !== b && vis[w][t] === 1) return true; } return false; };
   const isWallCell = new Uint8Array(N * M); for (const c of walls) isWallCell[c] = 1;
   const holders = new Uint8Array(N * M);   // living dots on each painting point
-  const born = groups.map(() => new Map()), today = groups.map(() => []);   // a mortal ween's dots by the day they appeared
+  const due = groups.map(() => new Map()), today = groups.map(() => []);   // a mortal ween's dots, filed under the day they vanish
   // moves blocked by a wall ween's dot (point, the day it appeared), tried again once a wall dot vanishes
   const pendK = groups.map(() => []), pendT = groups.map(() => []), pendSet = groups.map(() => new Set()), retry = groups.map(() => null);
   let live = 0, full = N * M - walls.length, lastDeath = 0, wallGone = false;
@@ -812,12 +821,12 @@ onmessage = (e) => {
     fronts[b] = Int32Array.from(fr); started[b] = true;
     if (mortal[b] && fr.length) today[b].push(fronts[b]);
   };
-  // the dots ween b grew on day t vanish
+  // ween b's dots due to vanish on day t go
   const vanish = (b, t) => {
-    const chunks = born[b].get(t); if (!chunks) return; born[b].delete(t);
+    const lists = due[b].get(t); if (!lists) return; due[b].delete(t);
     const V = vis[b], wall = !!groups[b].wall;
     if (wall) wallGone = true;
-    for (const ch of chunks) for (let i = 0; i < ch.length; i++) {
+    for (const chunks of lists) for (const ch of chunks) for (let i = 0; i < ch.length; i++) {
       const k = ch[i]; if (wall) V[k] = 3;
       const c = cellOf(k); if (c >= 0 && --holders[c] === 0 && !isWallCell[c]) live--;
     }
@@ -850,20 +859,20 @@ onmessage = (e) => {
   const maxStart = Math.max(0, ...groups.map((g) => g.day | 0));
   groups.forEach((g, b) => { if (g.wall && (g.day | 0) === 0) seed(b); });
   groups.forEach((g, b) => { if (!g.wall && (g.day | 0) === 0) seed(b); });
-  const keepBorn = () => groups.forEach((g, b) => { if (mortal[b] && today[b].length) { born[b].set(d, today[b]); today[b] = []; lastDeath = Math.max(lastDeath, d + life[b]); } });
+  const keepBorn = () => groups.forEach((g, b) => { if (mortal[b] && today[b].length) { const D = d + lifeOf[b](d), l = due[b].get(D); if (l) l.push(today[b]); else due[b].set(D, [today[b]]); today[b] = []; lastDeath = Math.max(lastDeath, D); } });
   let d = 0;
   keepBorn();
   counts.push(eToday); lives.push(live);
   const flush = (done) => { postMessage({ cells: cells.slice(0, nc), grps: grps.slice(0, nc), counts: Int32Array.from(counts), lives: Int32Array.from(lives), done }); nc = 0; counts = []; lives = []; last = Date.now(); };
   while (d < 65533 && (d < maxStart || d < lastDeath || fronts.some((fr) => fr.length))) {
-    if (groups.length === 1 && !groups[0].life && live >= full) break;   // one ween: nothing more to show once the picture is full
+    if (groups.length === 1 && !mortal[0] && live >= full) break;   // one ween: nothing more to show once the picture is full
     d++; eToday = 0; wallGone = false;
-    groups.forEach((g, b) => { if (mortal[b]) vanish(b, d - life[b]); });   // dots whose lifespan is up go first
+    groups.forEach((g, b) => { if (mortal[b]) vanish(b, d); });   // dots whose lifespan is up go first
     // a wall dot went: blocked moves get another try, from dots that were still alive yesterday
     if (wallGone) groups.forEach((g, b) => {
       if (!pendK[b].length) return;
       const k = [], t = [];
-      for (let i = 0; i < pendK[b].length; i++) if (pendT[b][i] >= d - life[b]) { k.push(pendK[b][i]); t.push(pendT[b][i]); }
+      for (let i = 0; i < pendK[b].length; i++) if (pendT[b][i] + lifeOf[b](pendT[b][i]) >= d) { k.push(pendK[b][i]); t.push(pendT[b][i]); }
       pendK[b] = []; pendT[b] = []; pendSet[b].clear();
       if (k.length) retry[b] = { k: Int32Array.from(k), t: Int32Array.from(t) };
     });
@@ -880,16 +889,8 @@ onmessage = (e) => {
 };
 </script>
 
-<script>
-const $ = (id) => document.getElementById(id);
-const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
-const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-const half = (v2) => (v2 % 2 === 0 ? String(v2 / 2) : `${v2}/2`);
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const MAXBITS = 2 ** 31, MAXDAY = 100000;
-const LIMIT = 5000;   // ms: stop counting if f(n) hasn't settled by then
-
-// Formula input: ⟨expr, expr⟩ templates with integer ranges such as t=0..5, expanded over every combination of the ranges.
+<script id="shared">
+// Shared by the page and both workers (each worker's script is this text followed by its own).
 // Every value a formula gives is rounded down to a whole number, unless it already is one: write ceil(…) to round up
 // or round(…) for the nearest. A hair of slack absorbs floating-point noise, so 0.1·30 still counts as 3.
 const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
@@ -940,6 +941,34 @@ function evalExpr(src, env) {
   if (i !== T.length) throw new Error(`Unexpected "${T[i]}" in "${src}".`);
   return v;
 }
+// A ween's lifespan for a dot that appears on day m: a number, or a formula in n (that day), rounded down to whole
+// days and at least 1. Infinity when the ween has no lifespan.
+function lifeFor(g) {
+  if (!g.lifeExpr) { const L = g.life > 0 ? g.life : Infinity; return () => L; }
+  const memo = new Map();
+  return (m) => {
+    let v = memo.get(m);
+    if (v === undefined) {
+      let x; try { x = evalExpr(g.lifeExpr, { n: m, t: m }); } catch { x = 1; }
+      v = Number.isFinite(x) ? Math.max(1, down(x)) : 1;
+      if (memo.size > 1e6) memo.clear();
+      memo.set(m, v);
+    }
+    return v;
+  };
+}
+</script>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
+const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+const half = (v2) => (v2 % 2 === 0 ? String(v2 / 2) : `${v2}/2`);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const MAXBITS = 2 ** 31, MAXDAY = 100000;
+const LIMIT = 5000;   // ms: stop counting if f(n) hasn't settled by then
+
+// Formula input: ⟨expr, expr⟩ templates with integer ranges such as t=0..5, expanded over every combination of the ranges.
 
 // Every coordinate must be a fraction p/q (q ≤ 1000); 0.25, 1/2 and results like 5/2 are fine, 5cos(1) is not.
 function toFrac(v, what) {
@@ -1024,9 +1053,12 @@ function parseInput(text) {
       if (i && /^\s*(ignores?\s+walls?|through\s+walls?|ghost)\s*$/i.test(part)) { opt.ghost = true; return; }
       const lm = i ? /^\s*(?:lifespan|life|lives)\s*[:=]?\s*(.+?)\s*(?:days?)?\s*$/i.exec(part) : null;
       if (lm) {
-        const L = Number(lm[1]);
-        if (!Number.isInteger(L) || L < 1 || L > 100000) throw new Error(`A ween's lifespan must be a whole number of days from 1 to 100000; got "${lm[1]}".`);
-        opt.life = L; return;
+        const L = Number(lm[1]), v = Number.isFinite(L) ? L : dayFormula(lm[1], "lifespan");
+        if (typeof v === "number") {
+          if (!Number.isInteger(v) || v < 1 || v > 100000) throw new Error(`A ween's lifespan must be a whole number of days from 1 to 100000, or a formula in n; got "${lm[1]}".`);
+          opt.life = v;
+        } else opt.lifeExpr = v.expr;
+        return;
       }
       const m = i ? /^\s*(day|start|colou?r|weight)\s*[:=]?\s*(.+?)\s*$/i.exec(part) : null;
       if (!m) { body += (i ? ";" : "") + part; return; }
@@ -1061,19 +1093,21 @@ function parseInput(text) {
   return { groups, dim, general, wallGroups };
 }
 
-// A weight is a number (2, -1/2, 2pi) or a formula in n, the day, like 2n+1 or n^2/2 (t means the same as n).
-// On day n every dot of the ween weighs w(n). Weights are not rounded.
-function parseWeight(val) {
+// A weight or lifespan is a number (2, -1/2, 2pi) or a formula in n, the day, like 2n+1 or n^2/2 (t means the same
+// as n): a number when it has no n, else { expr }. On day n every dot of the ween weighs w(n), not rounded; a dot that
+// appears on day n lasts L(n) days, rounded down and at least 1.
+function dayFormula(val, what) {
   const src = val.trim();
   const bad = (src.match(/[a-zA-Z_]\w*/g) || []).find((v) => !["n", "t", "pi", ...FUNCS].includes(v));
-  if (bad) throw new Error(`A ween's weight is a number or a formula in n (the day), like weight 2n+1; "${bad}" isn't n.`);
-  const at = (n) => { let v; try { v = evalExpr(src, { n, t: n }); } catch (e) { throw new Error(`The weight "${src}" can't be worked out on day ${n}: ${e.message}`); }
-    if (!Number.isFinite(v)) throw new Error(`The weight "${src}" isn't a number on day ${n}.`); return v; };
+  if (bad) throw new Error(`A ween's ${what} is a number or a formula in n (the day), like ${what} 2n+1; "${bad}" isn't n.`);
+  const at = (n) => { let v; try { v = evalExpr(src, { n, t: n }); } catch (e) { throw new Error(`The ${what} "${src}" can't be worked out on day ${n}: ${e.message}`); }
+    if (!Number.isFinite(v)) throw new Error(`The ${what} "${src}" isn't a number on day ${n}.`); return v; };
   const w0 = at(0);
   if (!/\b[nt]\b/.test(src.replace(/(\d)([nt])\b/g, "$1 $2"))) return w0;   // no n: a plain number
   for (const n of [1, 2, 3, 10, 100]) at(n);
   return { expr: src };
 }
+const parseWeight = (val) => dayFormula(val, "weight");
 // A ween's weight on day n, and every ween's weights on one day (kept, since each point asks for them)
 function weightOn(g, n) {
   if (!g.wexpr) return g.weight;
@@ -1438,7 +1472,7 @@ function layout() {
 
 // Reach: first day each painting point joins nA, from a breadth-first search in a worker.
 let reach = null, shown = -1, cur = 0, playing = false, tick = null, gworker = null, geoNow = null;
-const gurl = URL.createObjectURL(new Blob([$("gsrc").textContent], { type: "text/javascript" }));
+const gurl = URL.createObjectURL(new Blob([$("shared").textContent + "\n" + $("gsrc").textContent], { type: "text/javascript" }));
 // A new set of points keeps the current day and play state: the old picture stays up while the search runs,
 // then the new reach is applied at the same day. A new painting or grid (different points) starts clean.
 let started = false;
@@ -1459,8 +1493,8 @@ function startReach() {
     if (!next) {
       next = { pic, order: new Int32Array(Math.max(1024, cells.length * 2)), n: 0, offsets: [0], live: [], maxDay: -1, done: false,
         groups: forGroups, simple: forSimple, walls: wallCells(pic).length, dayOf: forGroups.map(() => new Int32Array(pic.N * pic.M).fill(0x7fffffff)),
-        life: forGroups.map((g) => (g.life > 0 ? g.life : Infinity)) };
-      next.lastLife = Math.max(0, ...next.life.filter(Number.isFinite));
+        lifeOf: forGroups.map(lifeFor), lifeExpr: forGroups.flatMap((g, k) => (g.lifeExpr ? [k] : [])),
+        lifeConst: [...new Set(forGroups.filter((g) => !g.lifeExpr && g.life > 0).map((g) => g.life))] };
       reach = next; shown = -1; pic.comp.data.set(pic.base);
     }
     if (next.n + cells.length > next.order.length) { const t = new Int32Array(Math.max(next.order.length * 2, next.n + cells.length)); t.set(next.order.subarray(0, next.n)); next.order = t; }
@@ -1471,7 +1505,9 @@ function startReach() {
     // no new painting points on the last days: trim them, but keep the days until the last dots have vanished
     if (done) {
       let e = next.offsets.length - 2; while (e > 0 && next.offsets[e + 1] === next.offsets[e]) e--;
-      while (next.offsets.length > 2 && next.offsets.length - 2 > e + next.lastLife) { next.offsets.pop(); next.live.pop(); }
+      let keep = e + Math.max(0, ...next.lifeConst);
+      for (const k of next.lifeExpr) for (let m = 0; m <= e; m++) keep = Math.max(keep, m + next.lifeOf[k](m));
+      while (next.offsets.length > 2 && next.offsets.length - 2 > keep) { next.offsets.pop(); next.live.pop(); }
     }
     const grew = next.maxDay < 0 || done;
     next.maxDay = next.offsets.length - 2; next.done = done;
@@ -1483,16 +1519,16 @@ function startReach() {
   };
   const GR = geoNow.general ? geoNow.groups : [{ starts: [[0, 0]], moves: geoNow.pts.filter((p) => p[0] || p[1]), day: 0, weight: 1, rgb: PALETTE[0], plain: true }];
   forGroups = GR; forSimple = GR.length === 1 && GR[0].plain;
-  gworker.postMessage({ groups: GR.map(({ starts, moves, day, wall, ghost, life }) => ({ starts, moves, day, wall, ghost, life })), N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q, walls: wallCells(pic) });
+  gworker.postMessage({ groups: GR.map(({ starts, moves, day, wall, ghost, life, lifeExpr }) => ({ starts, moves, day, wall, ghost, life, lifeExpr })), N: pic.N, M: pic.M, cx: pic.cx, cy: pic.cy, q: geoNow.q, walls: wallCells(pic) });
 }
 const REDS = [[224, 53, 43], [240, 74, 53], [201, 42, 34], [255, 95, 69]], JIT = [1, 1.07, 0.9, 1.14];
 let forGroups = null, forSimple = true;
 // a point's colour on day d: the weight-weighted mix of the colours of the weens that hold it (one plain ween: the reds)
 function cellColour(t, d) {
   if (reach.simple) return reach.dayOf[0][t] <= d ? REDS[t & 3] : null;
-  const G = reach.groups, D = reach.dayOf, X = reach.life, Wd = weightsOn(G, d);
+  const G = reach.groups, D = reach.dayOf, X = reach.lifeOf, Wd = weightsOn(G, d);
   let r = 0, g = 0, b = 0, ws = 0, r0 = 0, g0 = 0, b0 = 0, n = 0;
-  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) {
+  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k](D[k][t])) {
     const c = G[k].rgb, w = Math.abs(Wd[k]) || 0;
     n++; r0 += c[0]; g0 += c[1]; b0 += c[2]; r += w * c[0]; g += w * c[1]; b += w * c[2]; ws += w;
   }
@@ -1503,8 +1539,8 @@ function cellColour(t, d) {
 }
 // total weight of a point on day d
 function cellWeight(t, d) {
-  let w = 0, n = 0; const G = reach.groups, D = reach.dayOf, X = reach.life, Wd = weightsOn(G, d);
-  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k]) { w += Wd[k]; n++; }
+  let w = 0, n = 0; const G = reach.groups, D = reach.dayOf, X = reach.lifeOf, Wd = weightsOn(G, d);
+  for (let k = 0; k < G.length; k++) if (D[k][t] <= d && d < D[k][t] + X[k](D[k][t])) { w += Wd[k]; n++; }
   return n ? w : null;
 }
 function applyDay(d) {
@@ -1521,7 +1557,10 @@ function applyDay(d) {
   if (was !== hi && mixShifts()) span(0, z);
   else {
     span(a + 1, z);
-    for (const L of new Set(reach.life)) if (Number.isFinite(L) && z - L >= 0) span(a + 1 - L, z - L);
+    for (const L of reach.lifeConst) if (z - L >= 0) span(a + 1 - L, z - L);
+    // a lifespan formula: the days m whose dots vanish between the two days, m + L(m) in (a, z]
+    for (const k of reach.lifeExpr) { let run = -1; for (let m = 0; m <= z; m++) { const D = m + reach.lifeOf[k](m), hit = m < z && D > a && D <= z;
+      if (hit && run < 0) run = m; if (!hit && run >= 0) { span(run, m - 1); run = -1; } } }
   }
   shown = d; pic.cg.putImageData(pic.comp, 0, 0);
 }
@@ -1643,7 +1682,7 @@ function legend(geo) {
   const G = geo && geo.general ? geo.groups : null;
   if ((!G || (G.length === 1 && G[0].plain && !G[0].day)) && !textWallGroups.length) { $("legend").innerHTML = ""; $("legendMore").hidden = true; return; }
   if (!G) { $("legend").innerHTML = textWallGroups.map((w) => `<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dots</span>`).join(""); foldLegend(); return; }
-  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${wText(g)}</span>`);
+  const items = G.map((g, k) => `<span><i style="background:rgb(${g.rgb.join(",")})"></i>ween ${k + 1}${g.wall ? " · wall" : ""}${g.ghost ? " · ignores walls" : ""} · day ${g.day}${g.lifeExpr ? ` · dots last ${g.lifeExpr.replace(/\s+/g, " ")} days` : g.life ? ` · dots last ${g.life} day${g.life === 1 ? "" : "s"}` : ""} · weight ${wText(g)}</span>`);
   for (const w of textWallGroups) items.push(`<span><i style="background:rgb(${w.rgb.join(",")}); border-radius: 2px"></i>wall · ${w.pts.length.toLocaleString()} dot${w.pts.length === 1 ? "" : "s"}</span>`);
   $("legend").innerHTML = items.join("");
   foldLegend();
@@ -1666,7 +1705,7 @@ function hoverInfo(e) {
   if (isWallAt(x, y)) txt += " · wall";
   else if (reach && reach.dayOf) {
     const parts = [], G = reach.groups, Wd = weightsOn(G, d); let w = 0;
-    for (let k = 0; k < G.length; k++) { const dd = reach.dayOf[k][t]; if (dd !== 0x7fffffff) { parts.push(`ween ${k + 1}${G[k].wall ? " (wall)" : ""} day ${dd}${Number.isFinite(reach.life[k]) ? `, gone day ${dd + reach.life[k]}` : ""}`); if (dd <= d && d < dd + reach.life[k]) w += Wd[k]; } }
+    for (let k = 0; k < G.length; k++) { const dd = reach.dayOf[k][t]; if (dd !== 0x7fffffff) { const L = reach.lifeOf[k](dd); parts.push(`ween ${k + 1}${G[k].wall ? " (wall)" : ""} day ${dd}${Number.isFinite(L) ? `, gone day ${dd + L}` : ""}`); if (dd <= d && d < dd + L) w += Wd[k]; } }
     txt += parts.length ? ` · weight ${+w.toFixed(6)} on day ${d} · reached by ${parts.join(", ")}` : " · not reached";
   }
   $("unit").textContent = txt;
@@ -2439,7 +2478,7 @@ function factsFast() {
 
 // ---- numbers
 let worker = null, timer = null, t0 = 0;
-const wurl = URL.createObjectURL(new Blob([$("wsrc").textContent], { type: "text/javascript" }));
+const wurl = URL.createObjectURL(new Blob([$("shared").textContent + "\n" + $("wsrc").textContent], { type: "text/javascript" }));
 let lastF = null;   // the latest counts a still-running count has sent
 function run() {
   if (worker) { worker.terminate(); worker = null; }
@@ -2484,7 +2523,7 @@ function run() {
       geo = geometry([[0, 0], ...o], dim); geo.q = q;
     } else {
       const G = groups.map((g, k) => ({ starts: scale(g.starts), moves: scale(g.moves).filter((p) => p[0] || p[1]), day: g.day || 0, weight: g.weight == null ? 1 : g.weight, wexpr: g.wexpr || null,
-        rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, plain: !g.wall && !g.ghost && !g.life && !g.color && !g.wexpr && (g.weight == null || g.weight === 1) }));
+        rgb: g.rgb || (g.wall ? [86, 96, 122] : PALETTE[k % PALETTE.length]), color: g.color, wall: !!g.wall, ghost: !!g.ghost, life: g.life || 0, lifeExpr: g.lifeExpr || null, plain: !g.wall && !g.ghost && !g.life && !g.lifeExpr && !g.color && !g.wexpr && (g.weight == null || g.weight === 1) }));
       const r = Math.max(0, ...G.map((g) => geometry([[0, 0], ...g.moves], dim).r));
       geo = { general: true, groups: G, r, q, k: G.reduce((a, g) => a + g.starts.length + g.moves.length, 0), walled,
         weighted: G.length > 1 || G.some((g) => g.weight !== 1 || g.wexpr) };
@@ -2493,7 +2532,7 @@ function run() {
   }
   catch (e) { $("err").textContent = e.message; $("err").hidden = false; Loader.mark("formula"); Loader.mark("reach"); return; }
   geoNow = geo; exactF = null; exactAn = null; exactW = null; legend(geo); startReach();
-  $("poly").textContent = "computing…"; $("stab").textContent = ""; $("meth").textContent = "";
+  $("poly").textContent = "computing…"; $("stab").textContent = ""; $("meth").textContent = ""; $("wpoly").hidden = true;
   if (fastSmall && !geo.general && (geo.q || 1) === 1) { showFast(fastSmall, fastMs); return; }
   facts(geo, null);
   if (geo.r === 0 && !geo.general) { show(geo, [1, 1, 1, 1, 1], "exact"); return; }
@@ -2504,7 +2543,7 @@ function run() {
   // a weight formula: W(n) = sum over weens of w(n) times the dots that ween holds on day n
   const weigh = (W, H) => (H ? H[0].map((_, n) => geo.groups.reduce((s, g, b) => s + weightOn(g, n) * H[b][n], 0)) : W);
   worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, weigh(e.data.W, e.data.H)); };
-  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life, wexpr }) => ({ starts, moves, day, weight, wall, ghost, life, vary: !!wexpr })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
+  if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life, lifeExpr, wexpr }) => ({ starts, moves, day, weight, wall, ghost, life, lifeExpr, vary: !!wexpr })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
   else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY, limit: LIMIT });
 }
 // With fractions, f(n) counts the sums that land on whole-number points. It is a polynomial on each residue
@@ -2528,12 +2567,91 @@ function analyseQ(geo, f) {
   return { r, N, n0, q, text, a2: (2 * parts[0][0]) / den, p: (n) => { const [A, B, K] = parts[n % q]; return (A * n * n + B * n + K) / den; } };
 }
 // Formula text to typeset HTML: italic f and n, stacked fractions, raised squares.
-const mathHTML = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/f\(n\)|(\d+)\/(\d+)|n²|(?<![A-Za-z])n(?![A-Za-z])/g, (m, a, b) =>
-  m === "f(n)" ? "<i>f</i>(<i>n</i>)" : a ? `<span class="fr"><span>${a}</span><span>${b}</span></span>` : m === "n²" ? "<i>n</i><sup>2</sup>" : "<i>n</i>");
-let exactW = null;
+const SUPS = "²³⁴⁵⁶⁷⁸⁹";
+const mathHTML = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/f\(n\)|W\(n\)|(\d+)\/(\d+)|n([²³⁴⁵⁶⁷⁸⁹])|(?<![A-Za-z])n(?![A-Za-z])/g, (m, a, b, p) =>
+  m === "f(n)" ? "<i>f</i>(<i>n</i>)" : m === "W(n)" ? "<i>W</i>(<i>n</i>)" : a ? `<span class="fr"><span>${a}</span><span>${b}</span></span>` : p ? `<i>n</i><sup>${SUPS.indexOf(p) + 2}</sup>` : "<i>n</i>");
+// The total weight W(n) settles, like f(n), into a quasi-polynomial when the weights are polynomials in n. Find the
+// lowest degree D, and the shortest period p (a multiple of q), whose (D+1)-th differences vanish over the last days
+// counted, then fit each residue class: exactly in fractions when the values are fractions, else in decimals.
+function fitW(W, q) {
+  const N = W.length - 1;
+  if (N < 3 || !W.every(Number.isFinite)) return null;
+  const C = (k, j) => { let v = 1; for (let i = 0; i < j; i++) v = v * (k - i) / (i + 1); return v; };
+  const big = Math.max(1, ...W.map(Math.abs));
+  const bg = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) [a, b] = [b, a % b]; return a; };
+  const fr = (n, d = 1n) => { if (d < 0n) { n = -n; d = -d; } const g = bg(n, d) || 1n; return [n / g, d / g]; };
+  const fadd = (x, y) => fr(x[0] * y[1] + y[0] * x[1], x[1] * y[1]), fsub = (x, y) => fr(x[0] * y[1] - y[0] * x[1], x[1] * y[1]), fmul = (x, y) => fr(x[0] * y[0], x[1] * y[1]);
+  const rat = (v) => {   // v as a fraction with denominator up to 10^4, or null (2pi is not a fraction)
+    const s = v < 0 ? -1n : 1n, x0 = Math.abs(v); let x = x0, h0 = 0, h1 = 1, k0 = 1, k1 = 0;
+    for (let i = 0; i < 40; i++) {
+      const a = Math.floor(x); [h0, h1] = [h1, a * h1 + h0]; [k0, k1] = [k1, a * k1 + k0];
+      if (k1 > 1e4 || h1 > 2 ** 53) return null;
+      if (Math.abs(x0 - h1 / k1) <= 1e-9 * Math.max(1, x0)) return fr(s * BigInt(h1), BigInt(k1));
+      if (x - a < 1e-12) break; x = 1 / (x - a);
+    }
+    return null;
+  };
+  const R = W.map(rat), exact = R.every(Boolean);
+  for (let k = 1; k <= 12; k++) {
+    const p = q * k;
+    for (let D = 0; D <= 8; D++) {
+      if ((D + 3) * p > N + 1) break;
+      // fractions: the differences must vanish exactly (1/(n+1) comes close to a polynomial but is not one)
+      const tol = 1e-9 * big * 2 ** (D + 1), cs = Array.from({ length: D + 2 }, (_, j) => BigInt(Math.round(C(D + 1, j))));
+      const vanishes = (n) => {
+        if (!exact) { let s = 0; for (let j = 0; j <= D + 1; j++) s += (j % 2 ? -1 : 1) * C(D + 1, j) * W[n - j * p]; return Math.abs(s) <= tol; }
+        let s = fr(0n); for (let j = 0; j <= D + 1; j++) { const t = fmul(R[n - j * p], fr(cs[j])); s = j % 2 ? fsub(s, t) : fadd(s, t); } return s[0] === 0n;
+      };
+      let n0 = N + 1;
+      for (let n = N; n >= (D + 1) * p; n--) { if (!vanishes(n)) break; n0 = n - (D + 1) * p; }
+      if (N - n0 + 1 < (D + 3) * p) continue;
+      // each residue class j: Newton's forward differences from its first day nj, then expanded in powers of n
+      const parts = [];
+      for (let j = 0; j < p; j++) {
+        const nj = n0 + ((((j - n0) % p) + p) % p);
+        const ys = []; for (let u = 0; u <= D; u++) ys.push(exact ? R[nj + u * p] : W[nj + u * p]);
+        const sub = exact ? fsub : (x, y) => x - y, add = exact ? fadd : (x, y) => x + y, zero = exact ? fr(0n) : 0;
+        const dif = []; let row = ys; for (let i = 0; i <= D; i++) { dif.push(row[0]); row = row.slice(1).map((v, t) => sub(v, row[t])); }
+        const coef = Array.from({ length: D + 1 }, () => zero);
+        let prod = [1n], den = 1n;
+        for (let i = 0; i <= D; i++) {
+          if (i > 0) { const c = BigInt(nj + (i - 1) * p), nx = Array(prod.length + 1).fill(0n); prod.forEach((v, t) => { nx[t + 1] += v; nx[t] -= c * v; }); prod = nx; den *= BigInt(p) * BigInt(i); }
+          prod.forEach((v, t) => { coef[t] = add(coef[t], exact ? fmul(dif[i], fr(v, den)) : dif[i] * Number(v) / Number(den)); });
+        }
+        parts.push(coef);
+      }
+      const val = (n) => { const c = parts[n % p]; let v = 0; for (let t = c.length - 1; t >= 0; t--) v = v * n + (exact ? Number(c[t][0]) / Number(c[t][1]) : c[t]); return v; };
+      let ok = true; for (let n = n0; n <= N && ok; n++) if (Math.abs(val(n) - W[n]) > 1e-6 * Math.max(1, Math.abs(W[n]))) ok = false;
+      if (!ok) continue;
+      const num = (c) => (exact ? (c[1] === 1n ? `${c[0] < 0n ? -c[0] : c[0]}` : `${c[0] < 0n ? -c[0] : c[0]}/${c[1]}`) : String(+Math.abs(c).toPrecision(6)));
+      const isZero = (c) => (exact ? c[0] === 0n : Math.abs(c) < 1e-9 * big), neg = (c) => (exact ? c[0] < 0n : c < 0), isOne = (c) => (exact ? (c[0] === c[1] || c[0] === -c[1]) : Math.abs(Math.abs(c) - 1) < 1e-12);
+      const text = parts.map((c) => {
+        let out = "";
+        for (let t = c.length - 1; t >= 0; t--) {
+          if (isZero(c[t])) continue;
+          const mono = t === 0 ? "" : t === 1 ? "n" : "n" + SUPS[t - 2], body = (isOne(c[t]) && t > 0 ? "" : num(c[t])) + mono;
+          out += out ? (neg(c[t]) ? " − " : " + ") + body : (neg(c[t]) ? "−" : "") + body;
+        }
+        return out || "0";
+      });
+      return { p, D, n0, text, at: val };
+    }
+  }
+  return null;
+}
+let exactW = null, exactWf = null;
 function show(geo, f, reason, provisional, W) {
   Loader.mark("formula");
   exactW = geo.weighted && W ? W : null;
+  exactWf = exactW ? fitW(exactW, geo.q || 1) : null;
+  // the total weight gets its own formula under f(n), which counts the dots
+  $("wpoly").hidden = !exactW;
+  if (exactW) {
+    const t = exactWf && exactWf.text, same = t && t.every((x) => x === t[0]);
+    $("wpoly").innerHTML = !t ? `<span class="wnote">total weight W(n): no formula over the days counted</span>`
+      : mathHTML(same ? `W(n) = ${t[0]}` : exactWf.p <= 6 ? t.map((x, j) => `W(n) = ${x} when n ≡ ${j} (mod ${exactWf.p})`).join("; ") : `W(n) repeats with period ${exactWf.p}; when n ≡ 0: ${t[0]}`)
+        + `<span class="wnote">total weight, from day ${exactWf.n0}</span>`;
+  }
   f = f || [];
   const ok = reason === "exact" || reason === "stable", an = !f.length ? { N: -1, text: null } : geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
   exactF = f; exactAn = ok ? an : null; setDay(cur);
@@ -2560,7 +2678,8 @@ function facts(geo, an, raw) {
   const f = fv;
   const row = (label, val) => `<tr><th>${label}</th>${Array.from({ length: N + 1 }, (_, n) => `<td data-d="${n}"${an && n === an.n0 ? ' class="st"' : ""}>${val(n)}</td>`).join("")}</tr>`;
   const d1 = (n) => (n >= q ? (f[n] - f[n - q]).toLocaleString() : ""), d2 = (n) => (n >= 2 * q ? (f[n] - 2 * f[n - q] + f[n - 2 * q]).toLocaleString() : "");
-  const wrow = exactW ? row("weight", (n) => (n >= exactW.length ? "" : Number.isFinite(exactW[n]) ? (+exactW[n].toFixed(6)).toLocaleString() : "—")) : "";
+  const wv = (n) => (n < exactW.length ? exactW[n] : exactWf ? exactWf.at(n) : null);
+  const wrow = exactW ? row("weight", (n) => { const v = wv(n); return v == null ? "" : Number.isFinite(v) ? (+v.toFixed(6)).toLocaleString() : "—"; }) : "";
   $("facts").innerHTML = `<table id="counts">${row("day n", (n) => n)}${row("f(n)", (n) => f[n].toLocaleString())}${wrow}${row(q > 1 ? `Δ<sub>${q}</sub>f` : "Δf", d1)}${row(q > 1 ? `Δ²<sub>${q}</sub>f` : "Δ²f", d2)}</table>`;
   markDay(cur);
 }
