@@ -594,6 +594,46 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
   const pending = groups.map(() => []), pendKeys = groups.map(() => new Set());
   const addPending = (b, x, y, t, src) => { const k = x + "," + y; if (!pendKeys[b].has(k)) { pendKeys[b].add(k); pending[b].push(x, y, t, src); } };
   const wallPts = new Set(); for (let k = 0; k < WP.length; k += 2) wallPts.add(WP[k] + "," + WP[k + 1]);
+  // Growth only changes form when it meets something: a wall, or another ween. Before the last such meeting the count
+  // can look settled and still change (a ween inside a far-off wall grows freely for a hundred days, then stops), so it
+  // may not settle until every ween could have reached every wall point and every other ween. How far a ween gets in
+  // n days is n times its move polygon (the hull of 0 and its moves); the day it could reach a point is that point's
+  // gauge for the polygon (Infinity where its moves never go).
+  const hull = (pts) => {
+    const Q = [...new Map(pts.map((p) => [p + "", p])).values()].sort((a, c) => a[0] - c[0] || a[1] - c[1]);
+    if (Q.length < 3) return Q;
+    const cr = (o, a, c) => (a[0] - o[0]) * (c[1] - o[1]) - (a[1] - o[1]) * (c[0] - o[0]), lo = [], up = [];
+    for (const p of Q) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+    for (let i = Q.length - 1; i >= 0; i--) { const p = Q[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  };
+  const gauge = (H, v) => {   // the least λ ≥ 0 with v in λ·H (H a convex polygon, counter-clockwise, holding 0)
+    if (!v[0] && !v[1]) return 0;
+    if (H.length < 3) {   // a segment through 0 (moves along one line), or a point
+      const A = H[0], B = H[H.length - 1], d = [B[0] - A[0], B[1] - A[1]];
+      if ((!d[0] && !d[1]) || d[0] * v[1] - d[1] * v[0] !== 0) return Infinity;
+      const dd = d[0] * d[0] + d[1] * d[1], sv = (v[0] * d[0] + v[1] * d[1]) / dd, a = (A[0] * d[0] + A[1] * d[1]) / dd, c = (B[0] * d[0] + B[1] * d[1]) / dd;
+      return sv > 0 ? (c > 1e-12 ? sv / c : Infinity) : a < -1e-12 ? sv / a : Infinity;
+    }
+    let g = 0;
+    for (let i = 0; i < H.length; i++) {
+      const a = H[i], c = H[(i + 1) % H.length], nx = c[1] - a[1], ny = a[0] - c[0], off = nx * a[0] + ny * a[1], nv = nx * v[0] + ny * v[1];
+      if (off > 1e-9) g = Math.max(g, nv / off); else if (nv > 1e-9) return Infinity;
+    }
+    return g;
+  };
+  let nEvents = 0;
+  {
+    const mh = groups.map((g) => hull([[0, 0], ...g.moves])), sh = groups.map((g) => (g.spawnOpen ? null : hull(g.starts)));
+    for (let b = 0; b < NG; b++) if (!groups[b].ghost && sh[b] && WP.length) for (const p of sh[b]) for (let k = 0; k < WP.length; k += 2) {
+      const g = gauge(mh[b], [WP[k] - p[0], WP[k + 1] - p[1]]); if (Number.isFinite(g)) nEvents = Math.max(nEvents, day[b] + Math.ceil(g));
+    }
+    for (let a = 0; a < NG; a++) for (let b = a + 1; b < NG; b++) {
+      if (!sh[a] || !sh[b]) continue;
+      const Mab = hull(mh[a].flatMap((p) => mh[b].map((t) => [p[0] - t[0], p[1] - t[1]])));   // the two polygons growing toward each other
+      for (const p of sh[a]) for (const t of sh[b]) { const g = gauge(Mab, [t[0] - p[0], t[1] - p[1]]); if (Number.isFinite(g)) nEvents = Math.max(nEvents, Math.max(day[a], day[b]) + Math.ceil(g)); }
+    }
+  }
   // a mortal ween's dots, filed under the day they vanish (the day they appeared plus their lifespan): x, y, starting dot.
   // At the end of a day a ween's front holds exactly the dots that appeared that day.
   const due = groups.map(() => new Map());
@@ -690,7 +730,7 @@ function countGroups(groups, r, maxBits, maxDay, q, walls = [], until = Infinity
     for (let p = 1; p <= PER; p++) {
       const st = q * p;
       if (n >= (r + 1) * st && diff(f, r + 1, n, st) !== 0) sp[p] = n + 1;
-      if (!settled && sp[p] <= n && n >= sp[p] + Math.max(15 * st, Math.ceil(sp[p] / 2)) && n >= 20 * st && n >= maxStart + (r + 2) * st && n >= maxDeath + (r + 2) * st) { settled = true; period = st; }
+      if (!settled && sp[p] <= n && n >= sp[p] + Math.max(15 * st, Math.ceil(sp[p] / 2)) && n >= 20 * st && n >= maxStart + (r + 2) * st && n >= maxDeath + (r + 2) * st && n >= nEvents + (r + 2) * st + 10) { settled = true; period = st; }
     }
     if (settled) break;
     if (n >= maxDay) { reason = "days"; break; }
