@@ -195,6 +195,7 @@ function pointsText(ps) {
   return { text: pairs.join(" "), err: "" };
 }
 const hexOk = (h) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(h);
+const colourFormula = (c) => { const m = /^\s*(?:hsla?|rgba?)\s*\((.*)\)\s*$/i.exec(String(c || "")); return !!m && /[a-z_]/i.test(m[1]); };   // like hsl(30t, 80%, 50%)
 const OPEN_RANGE = /\b[a-zA-Z_]\w*\s*(?:=|\bin\b|\bfrom\b)\s*-?\d+\s*\.\.(?!\s*-?\d)/;   // k=1.. with no end, as Peener reads it
 function itemText(it) {
   if (it.kind === "wall") {
@@ -220,6 +221,7 @@ function itemText(it) {
   if (dayNum) opts.push(`day ${Math.round(Number(dayTxt))}`);   // ticked: written even when it is 0
   if (dayFn) opts.push(`day ${dayTxt}`);
   if (it.useColor && hexOk(it.color)) opts.push(`color ${it.color}`);
+  else if (it.useColor && colourFormula(it.color)) opts.push(`color ${it.color.trim()}`);   // a colour per starting dot, like hsl(30t, 80%, 50%)
   if (it.useWeight) {   // a number, or a formula in n (the day), like 2n+1
     const w = String(it.weight ?? "").trim(), v = Number(w);
     if (w !== "" && Number.isFinite(v)) { if (v !== 1) opts.push(`weight ${v}`); }
@@ -258,7 +260,7 @@ function render() {
     const title = it.kind === "wall" ? `Wall ${++wl}` : `Ween ${++wn}`;
     const sw = it.kind === "wall" ? it.color : it.useColor ? it.color : it.wall ? WALLWEEN : PALETTE[(wn - 1) % PALETTE.length];
     const tools = `<span class="tools"><button type="button" class="icon" data-act="up:${i}" title="Move up" aria-label="Move up">↑</button><button type="button" class="icon" data-act="down:${i}" title="Move down" aria-label="Move down">↓</button><button type="button" data-act="dup:${i}">Duplicate</button><button type="button" data-act="del:${i}">Remove</button></span>`;
-    const colour = (on) => `<input type="color" data-f="color" value="${hexOk(it.color) && it.color.length === 7 ? it.color : "#000000"}" ${on ? "" : "disabled"} aria-label="Colour"><input type="text" class="hex" data-f="color" value="${esc(it.color)}" ${on ? "" : "disabled"} aria-label="Colour as hex" spellcheck="false">`;
+    const colour = (on) => `<input type="color" data-f="color" value="${hexOk(it.color) && it.color.length === 7 ? it.color : "#000000"}" ${on ? "" : "disabled"} aria-label="Colour"><input type="text" class="hex" data-f="color" value="${esc(it.color)}" ${on ? "" : "disabled"} aria-label="Colour as hex, or a formula like hsl(30t, 80%, 50%)" title="A hex colour, or a formula in the starting dots' variable, like hsl(30t, 80%, 50%)" spellcheck="false">`;
     let body;
     if (it.kind === "wall") {
       body = pointsForm("pts", it.pts, "Wall points") +
@@ -574,7 +576,10 @@ function parsePeener(src) {
         else if (weightOk(k[1])) { o.useWeight = true; o.weight = k[1]; }   // a formula in n, the day
         else warn.push(`${name}: a weight must be a number or a formula in n, like 2n+1; got "${k[1]}".`);
       } else if ((k = /^\s*colou?r\s*[:=]?\s*(.+?)\s*$/i.exec(p))) {
-        const hex = toHex(k[1]); if (hex) { o.useColor = true; o.color = hex; } else warn.push(`${name}: "${k[1]}" is not a colour.`);
+        const hex = toHex(k[1]);
+        if (hex) { o.useColor = true; o.color = hex; }
+        else if (colourFormula(k[1])) { o.useColor = true; o.color = k[1].trim(); }   // a colour per starting dot, like hsl(30t, 80%, 50%)
+        else warn.push(`${name}: "${k[1]}" is not a colour.`);
       } else warn.push(`${name}: skipped "${p.trim()}".`);
     });
     const sm = splitTop(body, ":"), L = sm ? sm[0] : body, R = sm ? sm[1] : "";
