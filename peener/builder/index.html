@@ -145,7 +145,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 // a set of points is { mode: "points" | "fn" | "text", points, fx, fy, from, to, step, text }
 const pointSet = (points, fn) => ({ mode: fn ? "fn" : "points", points: points || "", fx: fn ? fn[0] : "t", fy: fn ? fn[1] : "0", from: fn ? fn[2] : -10, to: fn ? fn[3] : 10, step: 1, text: "" });
 const newWeen = (k, o = {}) => ({ kind: "ween", starts: pointSet("0,0"), moves: pointSet("1,0 0,1 -1,-1"),
-  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, wall: false, blocked: true, ...o });
+  useDay: false, day: 0, useColor: true, color: PALETTE[k % PALETTE.length], useWeight: false, weight: 1, useLife: false, life: 10, wall: false, blocked: true, ...o });
 const newWall = (o = {}) => ({ kind: "wall", pts: pointSet("", ["t", "10", -20, 20]), color: WALL, ...o });
 let items = [];
 try { items = JSON.parse(localStorage.getItem("weenbuilder:v1") || "null") || []; } catch { items = []; }
@@ -190,6 +190,7 @@ function itemText(it) {
   if (it.useDay && Number(it.day) > 0) opts.push(`day ${Math.round(Number(it.day))}`);
   if (it.useColor && hexOk(it.color)) opts.push(`color ${it.color}`);
   if (it.useWeight && Number(it.weight) !== 1 && Number.isFinite(Number(it.weight))) opts.push(`weight ${Number(it.weight)}`);
+  if (it.useLife) { const L = Math.round(Number(it.life)); if (!(L >= 1)) return { text: "", err: "Lifespan: a whole number of days, 1 or more." }; opts.push(`lifespan ${L}`); }
   if (it.wall) opts.push("wall");
   if (!it.blocked) opts.push("ignores walls");
   return { text: `{${s.text}${m.text ? " : " + m.text : ""}${opts.map((o) => " ; " + o).join("")}}`, err: "" };   // no moves: no colon
@@ -227,6 +228,7 @@ function render() {
           <div class="check"><label><input type="checkbox" data-f="useDay" ${it.useDay ? "checked" : ""}> Starts on day</label><input type="number" data-f="day" min="0" value="${esc(it.day)}" ${it.useDay ? "" : "disabled"} aria-label="Start day"></div>
           <div class="check"><label><input type="checkbox" data-f="useColor" ${it.useColor ? "checked" : ""}> Colour</label>${colour(it.useColor)}</div>
           <div class="check"><label><input type="checkbox" data-f="useWeight" ${it.useWeight ? "checked" : ""}> Weight</label><input type="number" data-f="weight" step="any" value="${esc(it.weight)}" ${it.useWeight ? "" : "disabled"} aria-label="Weight"></div>
+          <div class="check"><label><input type="checkbox" data-f="useLife" ${it.useLife ? "checked" : ""}> Lifespan</label><input type="number" data-f="life" min="1" step="1" value="${esc(it.life ?? 10)}" ${it.useLife ? "" : "disabled"} aria-label="Lifespan in days"><span class="note">days, then it vanishes</span></div>
           <div class="check"><label><input type="checkbox" data-f="wall" ${it.wall ? "checked" : ""}> Acts as a wall: no other ween, wall weens included, can land on or cross its dots</label></div>
           <div class="check"><label><input type="checkbox" data-f="blocked" ${it.blocked ? "checked" : ""}> Blocked by walls</label></div>
         </div></div>`;
