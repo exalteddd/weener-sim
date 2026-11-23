@@ -1476,10 +1476,12 @@ function buildWallCanvas() {
   for (const k of walls) { const [x, y] = k.split(",").map(Number); put(x, y, [38, 33, 29]); }
   g.putImageData(img, 0, 0); wallCv = { c, g, img, pic };
 }
+let strokeLog = null;   // the dots the current stroke changed, so a pinch that starts mid-stroke can undo them
 function setWall(x, y, on) {
   const k = x + "," + y;
   if (on === walls.has(k)) return false;
   if (on) walls.add(k); else walls.delete(k);
+  if (strokeLog) strokeLog.push([x, y]);
   if (wallCv && wallCv.pic === pic) { const i = x + pic.cx, j = pic.cy - y; if (i >= 0 && j >= 0 && i < pic.N && j < pic.M) { const t = j * pic.N + i; wallCv.img.data[4 * t + 3] = on ? 255 : 0; wallCv.img.data[4 * t] = 38; wallCv.img.data[4 * t + 1] = 33; wallCv.img.data[4 * t + 2] = 29; } }
   return true;
 }
@@ -2477,21 +2479,63 @@ function zoomAt(f, mx, my) {
 }
 $("art").addEventListener("wheel", (e) => { e.preventDefault(); const r = $("art").getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
 let drag = null;
+// One finger (or the mouse) drags, or paints walls in wall mode. Two fingers pinch: the picture zooms about the
+// point between them and follows that point as they move. Lifting one finger goes back to dragging.
+const fingers = new Map(); let pinch = null;
+const capture = (id) => { try { $("art").setPointerCapture(id); } catch {} };
+function pinchState() {
+  const [a, b] = [...fingers.values()], r = $("art").getBoundingClientRect();
+  return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top };
+}
+function endStroke(keep) {
+  if (!stroke) return;
+  const s = stroke; stroke = null; strokeLog = null;
+  if (keep) { if (s.changed) wallsChanged(); return; }
+  for (const [x, y] of s.log) setWall(x, y, !s.on);   // a pinch began: undo what the first finger painted
+  if (wallCv) wallCv.g.putImageData(wallCv.img, 0, 0);
+  draw();
+}
 $("art").addEventListener("pointerdown", (e) => {
   if (!view) return;
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); capture(e.pointerId);
+  if (fingers.size >= 2) {
+    if (fingers.size === 2 && !bigPts) { drag = null; endStroke(false); pinch = pinchState(); }
+    return;
+  }
   if (wallMode() && pic && !bigPts) {
-    e.preventDefault(); $("art").setPointerCapture(e.pointerId);
-    const c = cellAt(e); stroke = { on: !(e.shiftKey || e.altKey || e.button === 2), last: c, changed: brushLine(c, c, !(e.shiftKey || e.altKey || e.button === 2)) };
+    e.preventDefault();
+    const c = cellAt(e), on = !(e.shiftKey || e.altKey || e.button === 2);
+    strokeLog = []; stroke = { on, last: c, log: strokeLog, changed: false }; stroke.changed = brushLine(c, c, on);
     draw(); return;
   }
-  drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy }; $("art").setPointerCapture(e.pointerId);
+  drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy };
 });
 $("art").addEventListener("pointermove", (e) => {
+  if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch) {
+    if (fingers.size < 2) return;
+    const p = pinchState();
+    zoomAt(p.d / pinch.d, p.mx, p.my);
+    if (view.pp !== view.fit.pp) { view.ox += p.mx - pinch.mx; view.oy += p.my - pinch.my; draw(); }
+    pinch = p; return;
+  }
   if (stroke) { const c = cellAt(e); if (c[0] !== stroke.last[0] || c[1] !== stroke.last[1]) { stroke.changed = brushLine(stroke.last, c, stroke.on) || stroke.changed; stroke.last = c; draw(); } return; }
   if (!drag) { hoverInfo(e); return; }
   view.ox = drag.ox + e.clientX - drag.x; view.oy = drag.oy + e.clientY - drag.y; draw();
 });
-$("art").addEventListener("pointerup", () => { drag = null; if (stroke) { const ch = stroke.changed; stroke = null; if (ch) wallsChanged(); } });
+function lift(e) {
+  fingers.delete(e.pointerId);
+  if (pinch) {
+    if (fingers.size < 2) {
+      pinch = null;
+      if (fingers.size === 1 && view) { const [p] = fingers.values(); drag = { x: p.x, y: p.y, ox: view.ox, oy: view.oy }; }
+    }
+    return;
+  }
+  drag = null; endStroke(true);
+}
+$("art").addEventListener("pointerup", lift);
+$("art").addEventListener("pointercancel", lift);
 $("art").addEventListener("pointerleave", () => { if (hoverCell) { hoverCell = null; $("unit").textContent = unitText; } });
 $("art").addEventListener("contextmenu", (e) => { if (wallMode()) e.preventDefault(); });
 $("wallMode").addEventListener("change", () => document.body.classList.toggle("walls", wallMode()));
