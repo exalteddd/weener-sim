@@ -177,7 +177,7 @@ function pointsText(ps) {
   if (ps.mode === "fn") {
     const fx = ps.fx.trim(), fy = ps.fy.trim();
     if (!fx || !fy) return { text: "", err: "Fill in both x and y." };
-    if (!/^[\w\s+\-*/^%().,]*$/.test(fx + fy)) return { text: "", err: "x and y can use numbers, t, + − * / ^, ( ), pi and ceil round floor sin cos sqrt abs min max." };
+    if (!/^[\w\s+\-*/^%().,]*$/.test(fx + fy)) return { text: "", err: "x and y can use numbers, t, + − * / ^, ( ), pi, e and functions like sqrt exp log sin cos round floor ceil abs min max." };
     const a = Number(ps.from), b = Number(ps.to), st = Number(ps.step) || 1;
     if (!Number.isInteger(a) || !Number.isInteger(b)) return { text: "", err: "The range for t needs whole numbers." };
     if (b < a) return { text: "", err: "The range for t runs backwards." };
@@ -295,30 +295,32 @@ function update() {
 // as in Peener: a formula's values are rounded down to whole numbers unless ceil(…) or round(…) says otherwise
 const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
 // a weight or lifespan formula: n is the day (t means the same); checked on a few days
-const weightOk = (w) => { if (!w || !/^[\w\s+\-*/^%().,]*$/.test(w)) return false; try { return [0, 1, 2, 3, 10].every((n) => Number.isFinite(evalFn(w, n, true))); } catch { return false; } };
+const weightOk = (w) => { if (!w || !/^[\w\s+\-*/^%().,]*$/.test(w)) return false; return [0, 1, 2, 3, 10].some((n) => { try { return Number.isFinite(evalFn(w, n, true)); } catch { return false; } }); };
 function evalFn(src, t, dayVar = false) {
   // tokens first, then the implied multiplications (2t, 2pi t, 8cos(…), 3(t+1), (t)(t), pi t), as Peener reads them
-  const raw = src.replace(/\*\*/g, "^").match(/\d+(?:\.\d+)?|[a-z]+|[-+*/^%(),]|\S/gi) || [];
+  const raw = src.replace(/\*\*/g, "^").match(/\d+(?:\.\d+)?|[a-z][a-z0-9]*|[-+*/^%(),]|\S/gi) || [];
   const toks = [];
   for (const k of raw) {
-    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi" || (dayVar && p === "n"));
-    if (val && (/^[a-z]/i.test(k) || k === "(" || (/^\d/.test(k) && !/^\d/.test(p)))) toks.push("*");
+    const p = toks[toks.length - 1], val = p !== undefined && (/^\d/.test(p) || p === ")" || p === "t" || p === "pi" || p === "e" || (dayVar && p === "n"));
+    if (val && (/^[a-z]/i.test(k) || k === "(" || (/^\d/.test(k) && !/^\d/.test(p)))) toks.push("·");   // implied ×
     toks.push(k);
   }
   let i = 0;
-  const F = { round: (v) => Math.round(v + EPS), floor: down, ceil: up, sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan, abs: Math.abs, min: Math.min, max: Math.max };
+  const F = { round: (v) => Math.round(v + EPS), floor: down, ceil: up, sqrt: Math.sqrt, cbrt: Math.cbrt, exp: Math.exp, log: (x, b) => (b === undefined ? Math.log(x) : Math.log(x) / Math.log(b)),
+    ln: Math.log, log2: Math.log2, log10: Math.log10, sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan,
+    sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, sign: Math.sign, abs: Math.abs, min: Math.min, max: Math.max };
   const atom = () => {
     const k = toks[i++];
     if (k === undefined) throw 0;
     if (/^\d/.test(k)) return Number(k);
-    if (k === "t" || (dayVar && k === "n")) return t; if (k === "pi") return Math.PI;
+    if (k === "t" || (dayVar && k === "n")) return t; if (k === "pi") return Math.PI; if (k === "e") return Math.E;
     if (k === "(") { const v = expr(); i++; return v; }
     if (k === "-") return -pow(); if (k === "+") return pow();
-    if (F[k]) { i++; const a = [expr()]; while (toks[i] === ",") { i++; a.push(expr()); } i++; return F[k](...a); }
+    if (F[k]) { if (toks[i] !== "(") { let v = pow(); while (toks[i] === "·") { i++; v *= pow(); } return F[k](v); } i++; const a = [expr()]; while (toks[i] === ",") { i++; a.push(expr()); } i++; return F[k](...a); }   // log n, or log(n)
     throw 0;
   };
   const pow = () => { const b = atom(); if (toks[i] === "^") { i++; return b ** pow(); } return b; };
-  const term = () => { let v = pow(); while ("*/%".includes(toks[i]) && toks[i]) { const o = toks[i++], w = pow(); v = o === "*" ? v * w : o === "/" ? v / w : v % w; } return v; };
+  const term = () => { let v = pow(); while ("*·/%".includes(toks[i]) && toks[i]) { const o = toks[i++], w = pow(); v = o === "*" || o === "·" ? v * w : o === "/" ? v / w : v % w; } return v; };
   const expr = () => { let v = term(); while (toks[i] === "+" || toks[i] === "-") { const o = toks[i++], w = term(); v = o === "+" ? v + w : v - w; } return v; };
   const v = expr(); if (i !== toks.length) throw 0; return v;
 }

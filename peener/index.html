@@ -115,6 +115,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
 #wpoly { font: 400 22px/1.25 var(--serif); font-variant-numeric: lining-nums; text-align: center; max-width: 100%; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; padding-bottom: .1em; }
 #wpoly::-webkit-scrollbar { display: none; }
 #wpoly i { font-style: italic; } #wpoly sup { font-size: .6em; vertical-align: .9em; line-height: 0; }
+#poly .fl + .fl, #wpoly .fl + .fl { margin-top: .12em; }
 #wpoly .wnote { font-size: 16px; font-style: italic; color: var(--ink-2); margin-left: .6em; }
 .fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 .12em; line-height: 1.05; }
 .fr > span:first-child { border-bottom: 1.5px solid currentColor; padding: 0 .1em .04em; }
@@ -199,11 +200,11 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
     <li><code>(1/2,1/2) (0.5,-1)</code> fractions: only sums landing on whole-number points count</li>
     <li><code>0 1 5</code> the set {0, 1, 5} on a number line</li>
     <li><code>00001,00000,01W00</code> a grid of marked cells</li>
-    <li><code>&lt;t, 2t&gt; t=0..5</code> a formula with a range; also <code>sin cos tan sqrt pi abs min max</code></li>
+    <li><code>&lt;t, 2t&gt; t=0..5</code> a formula with a range; also <code>pi e sqrt cbrt exp log ln log2 log10 sin cos tan asin acos atan sinh cosh tanh abs sign min max</code>; <code>log</code> is the natural log (<code>log(x, 2)</code> for base 2), and one-number functions need no brackets: <code>log n</code>, and <code>log 2n</code> is log(2n); use brackets for more, like <code>sin(2pi t/8)</code></li>
     <li><code>&lt;t, t/2&gt; t=0..5</code> a formula's values are rounded down to whole numbers (2.5 → 2, −2.5 → −3); write <code>ceil(t/2)</code> to round up or <code>round(t/2)</code> for the nearest</li>
     <li><code>{[0,1] [0,2] : [1,1] [1,2]}</code> a ween: start at [0,1] and [0,2], move only by [1,1] and [1,2]; several weens combine</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; day 5 ; color blue ; weight 2}</code> a ween that starts on day 5, drawn blue, weighing 2</li>
-    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; weight n}</code> a weight can be a formula in n, the day: on day n each of its dots weighs n (also <code>2n+1</code>, <code>n^2/2</code>, <code>1/(n+1)</code>; not rounded); W(n), the total weight, gets its own formula under f(n)</li>
+    <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; weight n}</code> a weight can be a formula in n, the day: on day n each of its dots weighs n (also <code>2n+1</code>, <code>n^2/2</code>, <code>log n</code>, <code>1/(n+1)</code>; not rounded; days it isn't defined, like log n on day 0, show "—"); W(n), the total weight, gets its own formula under f(n)</li>
     <li><code>{[0,0] : [1,0] [0,1] [-1,-1] ; lifespan n+1}</code> a lifespan can be a formula in n too: a dot that appears on day n lasts n+1 days (rounded down, at least 1)</li>
     <li><code>{[0,10] : [1,0] [-1,0] ; wall}</code> a wall ween: no other ween, wall weens included, can land on or cross its dots; this one grows sideways</li>
     <li class="exh">How a ween is written</li>
@@ -894,7 +895,11 @@ onmessage = (e) => {
 // Every value a formula gives is rounded down to a whole number, unless it already is one: write ceil(…) to round up
 // or round(…) for the nearest. A hair of slack absorbs floating-point noise, so 0.1·30 still counts as 3.
 const EPS = 1e-9, down = (v) => Math.floor(v + EPS), up = (v) => Math.ceil(v - EPS);
-const FUNCS = ["abs", "min", "max", "round", "floor", "ceil", "sqrt", "sin", "cos", "tan"];
+const FUNCS = ["abs", "min", "max", "round", "floor", "ceil", "sqrt", "cbrt", "exp", "log", "ln", "log2", "log10",
+  "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "sign"];
+// log is the natural log (log(x, b): base b); a one-number function needs no brackets: log n, sqrt n, exp 2
+const callFn = (t, a) => (t === "min" ? Math.min(...a) : t === "max" ? Math.max(...a) : t === "round" ? Math.round(a[0] + EPS) : t === "floor" ? down(a[0])
+  : t === "ceil" ? up(a[0]) : t === "ln" ? Math.log(a[0]) : t === "log" ? (a.length > 1 ? Math.log(a[0]) / Math.log(a[1]) : Math.log(a[0])) : Math[t](a[0]));
 function evalExpr(src, env) {
   const toks = src.match(/\d+(?:\.\d+)?|[a-zA-Z_]\w*|[-+*\/^%(),]|\S/g) || [];
   const bad = toks.find((t) => !/^(?:\d|[a-zA-Z_]|[-+*\/^%(),])/.test(t));
@@ -903,7 +908,7 @@ function evalExpr(src, env) {
   const T = [], isName = (t) => /^[a-z_]/i.test(t), isFn = (t) => FUNCS.includes(t);
   for (const t of toks) {
     const p = T[T.length - 1];
-    if (p && (/^\d/.test(p) || p === ")" || (isName(p) && !isFn(p))) && (isName(t) || t === "(" || (/^\d/.test(t) && p === ")"))) T.push("*");
+    if (p && (/^\d/.test(p) || p === ")" || (isName(p) && !isFn(p))) && (isName(t) || t === "(" || (/^\d/.test(t) && p === ")"))) T.push("·");   // implied ×
     T.push(t);
   }
   let i = 0;
@@ -916,21 +921,24 @@ function evalExpr(src, env) {
     if (t === "-") return -power();
     if (t === "+") return power();
     if (isFn(t)) {
-      if (next() !== "(") throw new Error(`Write ${t}(…) in "${src}".`);
+      // no brackets: it takes the factors written right after it, so log 2n = log(2n) and sin 2pi t = sin(2πt)
+      if (peek() !== "(") { if (t === "min" || t === "max") throw new Error(`Write ${t}(…, …) in "${src}".`); let v = power(); while (peek() === "·") { next(); v *= power(); } return callFn(t, [v]); }
+      next();
       const a = [expr()]; while (peek() === ",") { next(); a.push(expr()); }
       if (next() !== ")") throw new Error(`Missing ")" in "${src}".`);
-      return t === "min" ? Math.min(...a) : t === "max" ? Math.max(...a) : t === "round" ? Math.round(a[0] + EPS) : t === "floor" ? down(a[0]) : t === "ceil" ? up(a[0]) : Math[t](a[0]);
+      return callFn(t, a);
     }
     if (t === "pi") return Math.PI;
+    if (t === "e" && !("e" in env)) return Math.E;
     if (isName(t)) { if (!(t in env)) throw new Error(`Give a range for ${t}, like ${t}=0..5.`); return env[t]; }
     throw new Error(`Unexpected "${t}" in "${src}".`);
   };
   const power = () => { const b = prim(); if (peek() === "^") { next(); return b ** power(); } return b; };
   const term = () => {
     let v = power();
-    while (["*", "/", "%"].includes(peek())) {
+    while (["*", "·", "/", "%"].includes(peek())) {
       const op = next(), w = power();
-      if (op === "*") v *= w;
+      if (op === "*" || op === "·") v *= w;
       else if (w === 0) throw new Error(`Division by zero in "${src}".`);
       else v = op === "/" ? v / w : ((v % w) + w) % w;
     }
@@ -1002,7 +1010,7 @@ function parse(text) {
     if (parts.length < 1 || parts.length > 2 || parts.some((q) => !q.trim())) throw new Error(`Write a formula as <x> or <x, y>; got <${body}>.`);
     if (dim !== null && parts.length !== dim) throw new Error("All formulas and points need the same number of coordinates.");
     dim = parts.length;
-    const vars = [...new Set((body.match(/[a-zA-Z_]\w*/g) || []).filter((v) => !FUNCS.includes(v) && v !== "pi"))];
+    const vars = [...new Set((body.match(/[a-zA-Z_]\w*/g) || []).filter((v) => !FUNCS.includes(v) && v !== "pi" && !(v === "e" && !ranges.e)))];
     for (const v of vars) if (!ranges[v]) throw new Error(`Give a range for ${v}, like ${v}=0..5.`);
     let combos = [{}];
     for (const v of vars) { combos = combos.flatMap((e) => ranges[v].map((x) => ({ ...e, [v]: x }))); if (combos.length > 20000) throw new Error("The ranges make more than 20,000 points; narrow them."); }
@@ -1098,13 +1106,12 @@ function parseInput(text) {
 // appears on day n lasts L(n) days, rounded down and at least 1.
 function dayFormula(val, what) {
   const src = val.trim();
-  const bad = (src.match(/[a-zA-Z_]\w*/g) || []).find((v) => !["n", "t", "pi", ...FUNCS].includes(v));
+  const bad = (src.match(/[a-zA-Z_]\w*/g) || []).find((v) => !["n", "t", "pi", "e", ...FUNCS].includes(v));
   if (bad) throw new Error(`A ween's ${what} is a number or a formula in n (the day), like ${what} 2n+1; "${bad}" isn't n.`);
-  const at = (n) => { let v; try { v = evalExpr(src, { n, t: n }); } catch (e) { throw new Error(`The ${what} "${src}" can't be worked out on day ${n}: ${e.message}`); }
-    if (!Number.isFinite(v)) throw new Error(`The ${what} "${src}" isn't a number on day ${n}.`); return v; };
-  const w0 = at(0);
-  if (!/\b[nt]\b/.test(src.replace(/(\d)([nt])\b/g, "$1 $2"))) return w0;   // no n: a plain number
-  for (const n of [1, 2, 3, 10, 100]) at(n);
+  // a typo fails on every day; a formula that is undefined on some days (log n on day 0, 1/n) is fine: those days show "—"
+  let first = null; const vals = [0, 1, 2, 3, 10, 100].map((n) => { try { return evalExpr(src, { n, t: n }); } catch (e) { first = first || e.message; return NaN; } });
+  if (!vals.some(Number.isFinite)) throw new Error(`The ${what} "${src}" can't be worked out${first ? `: ${first}` : " on any day"}.`);
+  if (!/\b[nt]\b/.test(src.replace(/(\d)([nt])\b/g, "$1 $2"))) return vals[0];   // no n: a plain number
   return { expr: src };
 }
 const parseWeight = (val) => dayFormula(val, "weight");
@@ -2542,7 +2549,7 @@ function run() {
   run.guard = setTimeout(() => { if (worker === w) { w.terminate(); worker = null; show(geo, lastF || [], "time"); } }, LIMIT + 1500);
   // a weight formula: W(n) = sum over weens of w(n) times the dots that ween holds on day n
   const weigh = (W, H) => (H ? H[0].map((_, n) => geo.groups.reduce((s, g, b) => s + weightOn(g, n) * H[b][n], 0)) : W);
-  worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, weigh(e.data.W, e.data.H)); };
+  worker.onmessage = (e) => { if (!e.data.done) { lastF = e.data.f; return; } clearTimeout(run.guard); show(e.data.period && e.data.period > (geo.q || 1) ? { ...geo, q: e.data.period, fmt: geo.fmt } : geo, e.data.f, e.data.reason, e.data.provisional, weigh(e.data.W, e.data.H), e.data.H); };
   if (geo.general) worker.postMessage({ groups: geo.groups.map(({ starts, moves, day, weight, wall, ghost, life, lifeExpr, wexpr }) => ({ starts, moves, day, weight, wall, ghost, life, lifeExpr, vary: !!wexpr })), q: geo.q, r: geo.r, maxBits: MAXBITS, maxDay: MAXDAY, walls: geo.walled ? wallList() : [], limit: LIMIT });
   else worker.postMessage({ G: geo.q > 1 ? geo.pts.filter((p) => p[0] || p[1]) : latticeGens(geo), q: geo.q, r: geo.r, lead: geo.lead, maxBits: MAXBITS, maxDay: MAXDAY, limit: LIMIT });
 }
@@ -2568,6 +2575,8 @@ function analyseQ(geo, f) {
 }
 // Formula text to typeset HTML: italic f and n, stacked fractions, raised squares.
 const SUPS = "²³⁴⁵⁶⁷⁸⁹";
+// a formula with several cases ("…; …") gets one line per case
+const mathLines = (t) => { const ls = t.split("; "); return ls.length < 2 ? mathHTML(t) : ls.map((l) => `<div class="fl">${mathHTML(l)}</div>`).join(""); };
 const mathHTML = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/f\(n\)|W\(n\)|(\d+)\/(\d+)|n([²³⁴⁵⁶⁷⁸⁹])|(?<![A-Za-z])n(?![A-Za-z])/g, (m, a, b, p) =>
   m === "f(n)" ? "<i>f</i>(<i>n</i>)" : m === "W(n)" ? "<i>W</i>(<i>n</i>)" : a ? `<span class="fr"><span>${a}</span><span>${b}</span></span>` : p ? `<i>n</i><sup>${SUPS.indexOf(p) + 2}</sup>` : "<i>n</i>");
 // The total weight W(n) settles, like f(n), into a quasi-polynomial when the weights are polynomials in n. Find the
@@ -2575,9 +2584,10 @@ const mathHTML = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/
 // counted, then fit each residue class: exactly in fractions when the values are fractions, else in decimals.
 function fitW(W, q) {
   const N = W.length - 1;
-  if (N < 3 || !W.every(Number.isFinite)) return null;
+  let s0 = 0; for (let n = 0; n <= N; n++) if (!Number.isFinite(W[n])) s0 = n + 1;   // fit only past days the weight is undefined
+  if (N - s0 < 3) return null;
   const C = (k, j) => { let v = 1; for (let i = 0; i < j; i++) v = v * (k - i) / (i + 1); return v; };
-  const big = Math.max(1, ...W.map(Math.abs));
+  const big = Math.max(1, ...W.slice(s0).map(Math.abs));
   const bg = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) [a, b] = [b, a % b]; return a; };
   const fr = (n, d = 1n) => { if (d < 0n) { n = -n; d = -d; } const g = bg(n, d) || 1n; return [n / g, d / g]; };
   const fadd = (x, y) => fr(x[0] * y[1] + y[0] * x[1], x[1] * y[1]), fsub = (x, y) => fr(x[0] * y[1] - y[0] * x[1], x[1] * y[1]), fmul = (x, y) => fr(x[0] * y[0], x[1] * y[1]);
@@ -2591,19 +2601,19 @@ function fitW(W, q) {
     }
     return null;
   };
-  const R = W.map(rat), exact = R.every(Boolean);
+  const R = W.map((v, n) => (n < s0 ? null : rat(v))), exact = R.slice(s0).every(Boolean);
   for (let k = 1; k <= 12; k++) {
     const p = q * k;
     for (let D = 0; D <= 8; D++) {
-      if ((D + 3) * p > N + 1) break;
+      if ((D + 3) * p > N + 1 - s0) break;
       // fractions: the differences must vanish exactly (1/(n+1) comes close to a polynomial but is not one)
-      const tol = 1e-9 * big * 2 ** (D + 1), cs = Array.from({ length: D + 2 }, (_, j) => BigInt(Math.round(C(D + 1, j))));
+      const tol = 1e-11 * big * 2 ** (D + 1), cs = Array.from({ length: D + 2 }, (_, j) => BigInt(Math.round(C(D + 1, j))));
       const vanishes = (n) => {
         if (!exact) { let s = 0; for (let j = 0; j <= D + 1; j++) s += (j % 2 ? -1 : 1) * C(D + 1, j) * W[n - j * p]; return Math.abs(s) <= tol; }
         let s = fr(0n); for (let j = 0; j <= D + 1; j++) { const t = fmul(R[n - j * p], fr(cs[j])); s = j % 2 ? fsub(s, t) : fadd(s, t); } return s[0] === 0n;
       };
       let n0 = N + 1;
-      for (let n = N; n >= (D + 1) * p; n--) { if (!vanishes(n)) break; n0 = n - (D + 1) * p; }
+      for (let n = N; n >= s0 + (D + 1) * p; n--) { if (!vanishes(n)) break; n0 = n - (D + 1) * p; }
       if (N - n0 + 1 < (D + 3) * p) continue;
       // each residue class j: Newton's forward differences from its first day nj, then expanded in powers of n
       const parts = [];
@@ -2634,29 +2644,47 @@ function fitW(W, q) {
         }
         return out || "0";
       });
-      return { p, D, n0, text, at: val };
+      return { p, D, n0, text, at: val, float: !exact };
     }
   }
   return null;
 }
 let exactW = null, exactWf = null;
-function show(geo, f, reason, provisional, W) {
+function show(geo, f, reason, provisional, W, H) {
   Loader.mark("formula");
   exactW = geo.weighted && W ? W : null;
   exactWf = exactW ? fitW(exactW, geo.q || 1) : null;
+  if (exactWf && exactWf.float && H) exactWf = null;   // decimals from a weight formula (sqrt n): weight × dots, below, is exact
   // the total weight gets its own formula under f(n), which counts the dots
   $("wpoly").hidden = !exactW;
-  if (exactW) {
-    const t = exactWf && exactWf.text, same = t && t.every((x) => x === t[0]);
-    $("wpoly").innerHTML = !t ? `<span class="wnote">total weight W(n): no formula over the days counted</span>`
-      : mathHTML(same ? `W(n) = ${t[0]}` : exactWf.p <= 6 ? t.map((x, j) => `W(n) = ${x} when n ≡ ${j} (mod ${exactWf.p})`).join("; ") : `W(n) repeats with period ${exactWf.p}; when n ≡ 0: ${t[0]}`)
-        + `<span class="wnote">total weight, from day ${exactWf.n0}</span>`;
+  if (exactW && exactWf) {
+    const t = exactWf.text, same = t.every((x) => x === t[0]);
+    $("wpoly").innerHTML = mathLines(same ? `W(n) = ${t[0]}` : exactWf.p <= 6 ? t.map((x, j) => `W(n) = ${x} when n ≡ ${j} (mod ${exactWf.p})`).join("; ") : `W(n) repeats with period ${exactWf.p}; when n ≡ 0: ${t[0]}`)
+      + `<span class="wnote">total weight, from day ${exactWf.n0}</span>`;
+  } else if (exactW) {
+    // not a polynomial (a weight like log n): fit each ween's dot count h(n), and W(n) = Σ weight(n) × h(n)
+    const hf = H ? H.map((h) => fitW(h, geo.q || 1)) : null;
+    let text = null;
+    if (hf && hf.every(Boolean)) {
+      exactWf = { n0: Math.max(...hf.map((h) => h.n0)), at: (n) => geo.groups.reduce((a, g, b) => a + weightOn(g, n) * hf[b].at(n), 0) };
+      const terms = geo.groups.map((g, b) => {
+        const h = hf[b].text; if (h.some((x) => x !== h[0])) return null;   // dots that repeat with a period: the table has the values
+        if (h[0] === "0") return "";
+        const we = g.wexpr && g.wexpr.trim().replace(/\s+/g, " ");
+        const w = we ? (/^[\w.]+$/.test(we) || /^[a-z]\w*\s*\([^()]*\)$/i.test(we) ? we : `(${we})`) : g.weight === 1 ? "" : String(+g.weight.toFixed(6));
+        const hp = h[0].length > 1 && /[+−-]/.test(h[0]) ? `(${h[0]})` : h[0];
+        return w === "" ? hp : w + (hp[0] === "(" || w.endsWith(")") ? "" : "·") + hp;
+      });
+      if (!terms.includes(null)) text = terms.filter(Boolean).join(" + ").replace(/\+ [−-]/g, "− ") || "0";
+    }
+    $("wpoly").innerHTML = text ? mathHTML(`W(n) = ${text}`) + `<span class="wnote">total weight: weight × dots, from day ${exactWf.n0}</span>`
+      : `<span class="wnote">total weight W(n): no formula over the days counted; its values are in the W(n) row below</span>`;
   }
   f = f || [];
   const ok = reason === "exact" || reason === "stable", an = !f.length ? { N: -1, text: null } : geo.q > 1 || geo.general ? analyseQ(geo, f) : analyse(geo, f);
   exactF = f; exactAn = ok ? an : null; setDay(cur);
   const allSame = an.text && an.text.every((t) => t === an.text[0]);
-  $("poly").innerHTML = mathHTML(!ok ? "f(n) = not settled" : !an.text ? `f(n) = ${poly(an)}` : allSame ? `f(n) = ${an.text[0]}`
+  $("poly").innerHTML = mathLines(!ok ? "f(n) = not settled" : !an.text ? `f(n) = ${poly(an)}` : allSame ? `f(n) = ${an.text[0]}`
     : an.q <= 6 ? an.text.map((t, j) => `f(n) = ${t} when n ≡ ${j} (mod ${an.q})`).join("; ") : `f(n) repeats with period ${an.q}; when n ≡ 0: ${an.text[0]}`);
   $("stab").textContent = ok ? `Stable from day ${an.n0}` : reason === "time" ? `Not settled after ${LIMIT / 1000} s, so counting stopped` : `Not settled by day ${an.N}`;
   const ms = performance.now() - t0;
@@ -2679,7 +2707,7 @@ function facts(geo, an, raw) {
   const row = (label, val) => `<tr><th>${label}</th>${Array.from({ length: N + 1 }, (_, n) => `<td data-d="${n}"${an && n === an.n0 ? ' class="st"' : ""}>${val(n)}</td>`).join("")}</tr>`;
   const d1 = (n) => (n >= q ? (f[n] - f[n - q]).toLocaleString() : ""), d2 = (n) => (n >= 2 * q ? (f[n] - 2 * f[n - q] + f[n - 2 * q]).toLocaleString() : "");
   const wv = (n) => (n < exactW.length ? exactW[n] : exactWf ? exactWf.at(n) : null);
-  const wrow = exactW ? row("weight", (n) => { const v = wv(n); return v == null ? "" : Number.isFinite(v) ? (+v.toFixed(6)).toLocaleString() : "—"; }) : "";
+  const wrow = exactW ? row("W(n)", (n) => { const v = wv(n); return v == null ? "" : Number.isFinite(v) ? (+v.toFixed(6)).toLocaleString() : "—"; }) : "";
   $("facts").innerHTML = `<table id="counts">${row("day n", (n) => n)}${row("f(n)", (n) => f[n].toLocaleString())}${wrow}${row(q > 1 ? `Δ<sub>${q}</sub>f` : "Δf", d1)}${row(q > 1 ? `Δ²<sub>${q}</sub>f` : "Δ²f", d2)}</table>`;
   markDay(cur);
 }
