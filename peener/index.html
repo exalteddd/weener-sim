@@ -37,7 +37,36 @@ a { color: inherit; }
 @keyframes peen { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 #toWeener { text-decoration: none; } #toWeener:hover h1 { color: var(--red); }
 #openW, #openB { font-style: italic; font-size: 19px; text-decoration: none; white-space: nowrap; }
-#openB { margin-left: auto; } #openB:hover { color: var(--red); }
+#libB { margin-left: auto; font-style: italic; font-size: 19px; text-decoration: none; white-space: nowrap; } #libB:hover, #openB:hover { color: var(--red); }
+#bookB { flex: none; }
+#lib, #bk { position: fixed; inset: 0; z-index: 20; background: rgba(42, 37, 32, .45); display: flex; align-items: flex-start; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 16px max(12px, env(safe-area-inset-left, 0px)); overflow-y: auto; }
+#bkPanel { background: var(--paper); border: 1px solid var(--rule); width: min(440px, 100%); margin-top: 12vh; padding: 16px 18px 18px; box-shadow: 0 20px 60px rgba(40, 30, 20, .25); display: grid; gap: 12px; }
+#bkPanel h2 { margin: 0; font: 500 20px var(--serif); letter-spacing: .24em; text-transform: uppercase; }
+#bkName { box-sizing: border-box; font: 500 19px var(--serif); width: 100%; height: 40px; padding: 0 10px; border: 1px solid #b9ab94; background: #fffdf8; }
+#bkCode { font: 13px/1.35 var(--mono); color: var(--ink-2); overflow-wrap: anywhere; max-height: 5.4em; overflow: auto; }
+#bkPanel .bkNote { font-size: 14px; color: var(--ink-2); font-style: italic; }
+#bkPanel .bkA { display: flex; justify-content: flex-end; gap: 8px; }
+#libPanel { background: var(--paper); border: 1px solid var(--rule); width: min(1100px, 100%); padding: 14px 18px 22px; box-shadow: 0 20px 60px rgba(40, 30, 20, .25); }
+#libHead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; border-bottom: 1px solid var(--rule); padding-bottom: 10px; margin-bottom: 14px; }
+#libHead h2 { margin: 0; font: 500 22px var(--serif); letter-spacing: .24em; text-transform: uppercase; }
+#libHead .libNote { color: var(--ink-2); font-style: italic; margin-right: auto; }
+.libLoad { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 1px solid #b9ab94; border-radius: 2px; background: var(--field); font-style: italic; cursor: pointer; white-space: nowrap; }
+.libLoad:hover { background: #fff; }
+#libGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.libCard { margin: 0; background: var(--field); border: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0; }
+.libCard img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; background: #fffdf8; cursor: pointer; border-bottom: 1px solid var(--rule); }
+.libCard .noshot { aspect-ratio: 3 / 2; display: grid; place-items: center; color: var(--ink-2); font-style: italic; border-bottom: 1px solid var(--rule); background: #fffdf8; cursor: pointer; }
+.libCard .lb { padding: 8px 10px 10px; display: grid; gap: 6px; min-width: 0; }
+.libCard input { font: 500 18px var(--serif); border: 0; border-bottom: 1px dashed var(--rule); background: transparent; padding: 2px 0; min-width: 0; width: 100%; }
+.libCard input:focus { outline: none; border-bottom-color: var(--ink-2); }
+.libCard .lc { font: 12px/1.35 var(--mono); color: var(--ink-2); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.libCard .lf { font-size: 15px; overflow-wrap: anywhere; }
+.libCard .ld { font-size: 13px; color: var(--ink-2); font-style: italic; }
+.libCard .la { display: flex; gap: 6px; flex-wrap: wrap; }
+.libCard .la button { height: 30px; font-size: 15px; padding: 0 12px; }
+.libEmpty { color: var(--ink-2); font-style: italic; margin: 10px 2px; grid-column: 1 / -1; }
+#ptoast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 14px; font-style: italic; z-index: 30; max-width: calc(100vw - 32px); }
 #openW:hover, #help summary:hover { color: var(--red); }
 #inrow { display: flex; align-items: center; gap: 16px; padding: 4px 4px; border-bottom: 1px solid var(--rule); }
 #inp { flex: 1 1 auto; min-width: 0; height: 48px; padding: 0; border: 0; background: transparent; font: 400 23px var(--serif); letter-spacing: .03em; word-spacing: .4em; font-variant-numeric: lining-nums; }
@@ -145,10 +174,10 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
 @media (max-width: 760px) {
   body { font-size: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   #title { gap: 12px; } #title .sep { display: none; } #title h1 { font-size: 19px; letter-spacing: .22em; }
-  .logo { width: 34px; height: 34px; } #openW, #openB { font-size: 15px; } #head { gap: 12px; }
+  .logo { width: 34px; height: 34px; } #openW, #openB, #libB { font-size: 15px; } #head { gap: 12px; }
   #inp { font-size: 17px; height: 42px; word-spacing: .15em; } summary { font-size: 16px; padding-left: 14px; }
   #ctl { gap: 14px; padding: 10px 4px; } #play { width: 84px; height: 40px; font-size: 18px; } #ctl .num { font-size: 17px; }
-  #ctl .vr { display: none; }
+  #ctl .vr { display: none; } #ctl { flex-wrap: wrap; row-gap: 8px; } #bookB { margin-left: auto; }
   #tools { grid-template-columns: 1fr; gap: 8px; padding: 10px 4px; font-size: 16px; } #tools .vr { display: none; }
   button { padding: 0 12px; font-size: 16px; height: 32px; } select { font-size: 16px; height: 34px; }
   #unit { font-size: 14px; } #credit { font-size: 15px; }
@@ -156,7 +185,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
   #counts { font-size: 15px; } #counts th { padding: 3px 14px 3px 4px; } #counts td { padding: 3px 8px; min-width: 2.6em; }
   /* phones: the header wraps instead of overlapping, the formula wraps instead of running off the edge,
      and the painting's box takes the painting's own shape instead of 60% of the screen height */
-  #head { flex-wrap: wrap; row-gap: 4px; } #title { flex: 1 0 100%; } #openB { margin-left: auto; }   /* the two links share a row under the title */
+  #head { flex-wrap: wrap; row-gap: 4px; } #title { flex: 1 0 100%; } #libB { margin-left: auto; }   /* the links share a row under the title */
   #poly { white-space: normal; overflow: visible; line-height: 1.55; }
   #wpoly { white-space: normal; overflow: visible; font-size: 18px; line-height: 1.5; }
   #fnmeta { flex-wrap: wrap; justify-content: center; text-align: center; gap: 2px 12px; } #fnmeta .vr { display: none; } #stab { white-space: nowrap; }
@@ -191,7 +220,7 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
 <form id="bar" autocomplete="off">
   <div id="head">
     <div id="title"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="8.0" cy="4.0" r="3.3" fill="#6c84c8"/><circle cx="16.0" cy="4.0" r="3.3" fill="#7480c6"/><circle cx="24.0" cy="4.0" r="3.3" fill="#7480c6"/><circle cx="8.0" cy="12.0" r="3.3" fill="#7480c6"/><circle cx="32.0" cy="12.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="20.0" r="3.3" fill="#3d4787"/><circle cx="16.0" cy="20.0" r="3.3" fill="#7c7cc3"/><circle cx="24.0" cy="20.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="28.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="36.0" r="3.3" fill="#7c7cc3"/></svg><span class="sep"></span><a id="toWeener" href="#" title="Reload Peener Sim"><h1>Peener Sim</h1></a></div>
-    <a id="openB" href="builder/" target="_blank" rel="noopener">Ween builder ↗&#xFE0E;</a><a id="openW" href="../" target="_blank" rel="noopener">Open Weener Sim ↗&#xFE0E;</a>
+    <a id="libB" href="#" role="button" title="Your bookmarked patterns">Library</a><a id="openB" href="builder/" target="_blank" rel="noopener">Ween builder ↗&#xFE0E;</a><a id="openW" href="../" target="_blank" rel="noopener">Open Weener Sim ↗&#xFE0E;</a>
   </div>
   <div id="inrow">
   <input id="inp" spellcheck="false" aria-label="Vectors" value="(-45,64) (64,-45) (-34,-34) (-49,-67)">
@@ -267,6 +296,8 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
   <span class="num">Day <span id="dayv">0</span></span>
   <span class="vr"></span>
   <span class="num"><i>f</i> = <span id="fv">1</span></span>
+  <span class="vr"></span>
+  <button type="button" id="bookB" title="Save this pattern, with a snapshot of the picture, to your library">☆ Bookmark</button>
 </div>
 <div id="tools">
   <span class="grp" id="zoomG"><button type="button" id="zin">Zoom in</button><button type="button" id="zout">Zoom out</button><button type="button" id="zfit">Fit</button></span>
@@ -280,6 +311,25 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
 </div>
 <div id="fn"><div id="poly">…</div><div id="wpoly" hidden></div><div id="fnmeta"><span id="stab"></span><span class="vr"></span><span id="meth"></span></div></div>
 <div id="facts">…</div>
+<div id="lib" hidden role="dialog" aria-modal="true" aria-labelledby="libT">
+  <div id="libPanel">
+    <div id="libHead"><h2 id="libT">Library</h2><span class="libNote">your bookmarks, kept in this browser</span>
+      <button type="button" id="libExport" title="Save the library as a file, to keep it or move it to another browser">Download</button>
+      <label class="libLoad" title="Add bookmarks from a downloaded library file">Load file<input type="file" id="libImport" accept="application/json,.json" hidden></label>
+      <button type="button" id="libClose">Close</button></div>
+    <div id="libGrid"></div>
+  </div>
+</div>
+<div id="bk" hidden role="dialog" aria-modal="true" aria-labelledby="bkT">
+  <form id="bkPanel">
+    <h2 id="bkT">Bookmark</h2>
+    <input id="bkName" maxlength="60" spellcheck="false" autocomplete="off" aria-label="Name">
+    <div id="bkCode"></div>
+    <div class="bkNote" id="bkNote"></div>
+    <div class="bkA"><button type="button" id="bkCancel">Cancel</button><button type="submit" id="bkSave">Save</button></div>
+  </form>
+</div>
+<div id="ptoast" role="status" hidden></div>
 
 <script id="wsrc" type="text/plain">
 // Walls are solid unit squares, corners included, centred on whole-number points. A move is blocked when its
@@ -1784,13 +1834,13 @@ const Loader = (() => {
 // cell of the scan (averaged when the grid is coarser than the scan, smoothly interpolated when finer).
 // Point (x, y) is grid cell (cx + x, cy − y). nA lives in the same coordinates; every point of nA that lands on the
 // painting replaces that point with red.
-let paintIdx = 0, pic = null, buildToken = 0, view = null;
+let paintIdx = 0, pic = null, buildToken = 0, view = null, artBusy = false;   // artBusy: a painting is loading
 async function buildArt() {
-  const token = ++buildToken, P = PAINTINGS[paintIdx];
+  const token = ++buildToken, P = PAINTINGS[paintIdx]; artBusy = true;
   $("paint").value = paintIdx;
   $("credit").innerHTML = `${P.artist}, <i>${P.title}</i>, ${P.year}.`;
   let img;
-  try { img = await loadImg(P.file, (f) => Loader.set(0.05 + 0.5 * f, "Downloading the painting")); } catch { $("credit").textContent = "The painting failed to load. Click the picture to try the next one."; Loader.finish(); return; }
+  try { img = await loadImg(P.file, (f) => Loader.set(0.05 + 0.5 * f, "Downloading the painting")); } catch { if (token === buildToken) artBusy = false; $("credit").textContent = "The painting failed to load. Click the picture to try the next one."; Loader.finish(); return; }
   Loader.set(0.57, "Sampling it into points");
   if (token !== buildToken) return;
   const N = Math.max(20, Math.min(5000, Math.round(Number($("dots").value) || 300)));
@@ -1816,6 +1866,7 @@ async function buildArt() {
     Promise.allSettled(others.map((O, k) => loadImg(O.file, (f) => { prog[k] = f; Loader.set(0.62 + 0.28 * prog.reduce((a, b) => a + b, 0) / prog.length, "Fetching the other paintings"); })))
       .then(() => Loader.mark("prefetch"));
   }
+  artBusy = false;
   layout(); startReach();
 }
 function layout() {
@@ -3179,6 +3230,9 @@ for (const b of document.querySelectorAll("#help .ex")) b.addEventListener("clic
 document.addEventListener("click", (e) => { if ($("help").open && !$("help").contains(e.target)) $("help").open = false; });
 // Space plays or pauses (except while typing in the vectors box); Esc resets to day 0
 document.addEventListener("keydown", (e) => {
+  const box = !$("bk").hidden ? $("bk") : !$("lib").hidden ? $("lib") : null;
+  if (e.key === "Escape" && box) { e.preventDefault(); box.hidden = true; return; }
+  if (box) return;
   if (e.key === "Escape") { e.preventDefault(); $("help").open = false; $("reset").click(); }
   else if (e.key === " " && e.target !== $("inp") && !e.target.closest("select")) { e.preventDefault(); $("play").click(); }
 });
@@ -3288,6 +3342,163 @@ const builderLink = () => { const v = $("inp").value.trim(); $("openB").href = v
 $("openB").addEventListener("click", builderLink); $("openB").addEventListener("pointerdown", builderLink); $("openB").addEventListener("focus", builderLink);
 addEventListener("hashchange", () => { if (inputFromLink()) { clearTimeout(timer); run(); } });
 $("legendMore").addEventListener("click", () => { const L = $("legend"), open = L.classList.toggle("open"); $("legendMore").textContent = open ? "Show less" : "Read more"; });
+// ── Library: bookmarked inputs, each with a snapshot of the picture as it was, kept in this browser ────────────
+const LIBKEY = "peener:library:v1";
+const libLoad = () => { try { const v = JSON.parse(localStorage.getItem(LIBKEY) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
+const libSave = (L) => { try { localStorage.setItem(LIBKEY, JSON.stringify(L)); return true; } catch { return false; } };
+function ptoast(msg) { const t = $("ptoast"); t.textContent = msg; t.hidden = false; clearTimeout(ptoast.h); ptoast.h = setTimeout(() => (t.hidden = true), 2200); }
+// the picture as it looks now (zoom and day included), cropped to 3:2 and shrunk
+function snapshot() {
+  const src = $("art");
+  if (!src || !src.width || !src.height || !src.offsetParent) return null;
+  const W = 300, H = 200, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d"); g.fillStyle = "#f7efe1"; g.fillRect(0, 0, W, H);
+  const k = Math.max(W / src.width, H / src.height), w = src.width * k, h = src.height * k;
+  g.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
+  try { return c.toDataURL("image/jpeg", 0.72); } catch { return null; }   // ~20 KB: a few hundred fit in the browser's storage
+}
+// the formulas as plain text (fractions as a/b, powers with ^)
+const formulaText = () => ["poly", "wpoly"].filter((id) => !$(id).hidden).map((id) => $(id).innerHTML
+  .replace(/<span class="fr"><span>([^<]+)<\/span><span>([^<]+)<\/span><\/span>/g, "$1/$2").replace(/<sup>(.+?)<\/sup>/g, "^$1")
+  .replace(/<\/div>/g, "; ").replace(/<span class="wnote">.*?<\/span>/g, "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/;\s*$/, "").trim()).filter(Boolean).join(" · ");
+// the next free "Untitled N" (skipping the bookmark being renamed)
+const untitled = (L, skip) => { let k = 0; for (const e of L) { const m = e.id !== skip && /^Untitled (\d+)$/.exec(String(e.name || "")); if (m) k = Math.max(k, Number(m[1])); } return `Untitled ${k + 1}`; };
+// the map for what's on screen now (not the last input's, still up while the new one is searched)
+const reachNow = () => reach && reach.pic === pic && reach.groups === forGroups;
+// The library picture: the pattern on day 50, or on the first day 80% of the grid is filled if that comes sooner,
+// cropped round the dots it has reached by then (and its walls) so a small pattern fills the card. It is drawn off
+// screen: the picture you're looking at keeps its day and zoom.
+const SNAP_DAY = 50, SNAP_FILL = 0.8;
+async function wallpaper() {
+  if (!mapOn() || bigPts || !pic) return { thumb: snapshot(), day: cur };
+  for (const t0 = Date.now(); Date.now() - t0 < 20000 && !(reachNow() && (reach.done || reach.maxDay >= SNAP_DAY)); ) await new Promise((r) => setTimeout(r, 150));
+  if (!reachNow() || reach.maxDay < 0) return { thumb: snapshot(), day: cur };
+  const R = reach, { N, M } = pic, tot = Math.max(1, N * M - R.walls);
+  let day = Math.min(SNAP_DAY, R.maxDay);
+  for (let d = 0; d < day; d++) if ((R.live[d] || 0) >= SNAP_FILL * tot) { day = d; break; }
+  let i0 = N, i1 = -1, j0 = M, j1 = -1;
+  const take = (t) => { const i = t % N, j = (t - i) / N; if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; };
+  for (let k = 0, e = R.offsets[day + 1]; k < e; k++) take(R.order[k]);
+  for (const t of wallCells(pic)) take(t);
+  let w = N, h = M, x0 = 0, y0 = 0;
+  if (i1 >= 0) {
+    w = Math.max(30, (i1 - i0 + 1) * 1.2 + 4); h = Math.max(20, (j1 - j0 + 1) * 1.2 + 4);
+    if (w < 1.5 * h) w = 1.5 * h;
+    w = Math.min(w, N, 1.5 * M); h = w / 1.5;
+    x0 = Math.max(0, Math.min(N - w, (i0 + i1 + 1) / 2 - w / 2)); y0 = Math.max(0, Math.min(M - h, (j0 + j1 + 1) / 2 - h / 2));
+  } else { w = Math.min(N, 1.5 * M); h = w / 1.5; x0 = (N - w) / 2; y0 = (M - h) / 2; }
+  const c = document.createElement("canvas"); c.width = 300; c.height = 200;
+  const g = c.getContext("2d"); g.fillStyle = "#f7efe1"; g.fillRect(0, 0, 300, 200);
+  applyDay(day);
+  g.imageSmoothingEnabled = 300 / w < 1; g.imageSmoothingQuality = "high";
+  g.drawImage(pic.cv, x0, y0, w, h, 0, 0, 300, 200);
+  const hasWalls = walls.size || textWallMap.size; if (hasWalls && (!wallCv || wallCv.pic !== pic)) buildWallCanvas();
+  if (300 / w < 1) {
+    // shrinking: several dots share a pixel, and a sparse pattern would fade into the painting. A pixel holding any
+    // dot a ween has (or any wall) takes their colour instead, so every dot reached shows.
+    const img = g.getImageData(0, 0, 300, 200), out = img.data, acc = new Float64Array(300 * 200 * 4), px = pic.comp.data, base = pic.base, sx = 300 / w, sy = 200 / h;
+    const pool = (t, src, q) => { const i = t % N, j = (t - i) / N, X = Math.floor((i - x0) * sx), Y = Math.floor((j - y0) * sy);
+      if (X < 0 || Y < 0 || X >= 300 || Y >= 200) return; const a = 4 * (Y * 300 + X); acc[a] += src[q]; acc[a + 1] += src[q + 1]; acc[a + 2] += src[q + 2]; acc[a + 3]++; };
+    for (let k = 0, e = R.offsets[day + 1]; k < e; k++) { const t = R.order[k], q = 4 * t; if (px[q] !== base[q] || px[q + 1] !== base[q + 1] || px[q + 2] !== base[q + 2]) pool(t, px, q); }
+    const fill = () => { for (let a = 0; a < acc.length; a += 4) if (acc[a + 3]) { out[a] = acc[a] / acc[a + 3]; out[a + 1] = acc[a + 1] / acc[a + 3]; out[a + 2] = acc[a + 2] / acc[a + 3]; out[a + 3] = 255; } };
+    fill();
+    if (hasWalls) { acc.fill(0); const wd = wallCv.img.data; for (const t of wallCells(pic)) pool(t, wd, 4 * t); fill(); }
+    g.putImageData(img, 0, 0);
+  } else if (hasWalls) { g.imageSmoothingEnabled = false; g.drawImage(wallCv.c, x0, y0, w, h, 0, 0, 300, 200); }
+  applyDay(cur);   // back to the day on screen
+  let thumb = null; try { thumb = c.toDataURL("image/jpeg", 0.75); } catch {}
+  return { thumb, day, box: [x0, y0, w, h].map((v) => +v.toFixed(2)) };
+}
+$("bookB").addEventListener("click", () => {
+  const input = $("inp").value.trim(); if (!input) { ptoast("Type a pattern first"); return; }
+  $("bkName").value = ""; $("bkName").placeholder = untitled(libLoad()); $("bkCode").textContent = input;
+  $("bkNote").textContent = !mapOn() ? "The map is off, so this bookmark gets no picture. Turn on Map to save one."
+    : bigPts ? "Its picture in the library is the picture as it looks now." : "Its picture in the library is the pattern on day 50, or sooner if it fills 80% of the grid first.";
+  $("bk").hidden = false; $("bkName").focus();
+});
+$("bkCancel").addEventListener("click", () => ($("bk").hidden = true));
+$("bk").addEventListener("click", (ev) => { if (ev.target === $("bk")) $("bk").hidden = true; });
+$("bkPanel").addEventListener("submit", async (ev) => {
+  ev.preventDefault(); $("bk").hidden = true;
+  const input = $("inp").value.trim(), typed = $("bkName").value.trim(); if (!input) return;
+  const B = $("bookB"); B.disabled = true; B.textContent = "Saving…";
+  const shot = await wallpaper();
+  const L = libLoad(), e = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: typed || untitled(L),
+    input, day: shot.day, box: shot.box || null, paint: paintIdx, dots: Number($("dots").value), formula: formulaText(), when: Date.now(), thumb: shot.thumb };
+  L.unshift(e);
+  B.disabled = false;
+  if (libSave(L)) ptoast(`Saved "${e.name}" to your library`);
+  else { e.thumb = null; if (!libSave(L)) { B.textContent = "☆ Bookmark"; ptoast("The library is full: delete or download some bookmarks first"); return; } ptoast("Saved without a picture: the library is nearly full"); }
+  B.textContent = "★ Bookmarked"; clearTimeout(B.h); B.h = setTimeout(() => (B.textContent = "☆ Bookmark"), 1600);
+});
+// open a bookmark: its painting, dots and input, then its day once the map has it
+function libOpen(e) {
+  $("lib").hidden = true;
+  const P = Number(e.paint), D = Number(e.dots); let rebuild = false;
+  if (Number.isInteger(P) && P >= 0 && P < PAINTINGS.length && P !== paintIdx) { paintIdx = P; $("paint").value = String(P); rebuild = true; }
+  if (D >= 100 && D <= 5000 && D !== Number($("dots").value)) { $("dots").value = String(D); $("dotsv").textContent = String(D); rebuild = true; }
+  $("inp").value = e.input;
+  if (rebuild) buildArt();
+  clearTimeout(timer); run();
+  const want = Math.max(0, Math.floor(Number(e.day) || 0)), t0 = Date.now(), box = Array.isArray(e.box) && e.box.length === 4 && e.box.every(Number.isFinite) ? e.box : null;
+  const frame = () => {   // zoom to what the library picture shows
+    if (!box || !view || view.N !== pic.N || view.M !== pic.M) return;
+    const [bx, by, bw, bh] = box, pp = Math.min(80, Math.max(view.fit.pp, Math.min(view.W / bw, view.H / bh)));
+    if (pp <= view.fit.pp * 1.0001) Object.assign(view, view.fit); else { view.pp = pp; view.ox = view.W / 2 - (bx + bw / 2) * pp; view.oy = view.H / 2 - (by + bh / 2) * pp; }
+    draw();
+  };
+  const toDay = () => {
+    if (!mapOn() || bigPts) { if (Date.now() - t0 > 600) setDay(Math.min(want, Number($("day").max))); else setTimeout(toDay, 250); return; }
+    if (!artBusy && reachNow() && reach.done) { setDay(Math.min(want, reach.maxDay)); frame(); } else if (Date.now() - t0 < 30000) setTimeout(toDay, 250);
+  };
+  toDay();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function libRender() {
+  const L = libLoad(), G = $("libGrid");
+  G.innerHTML = L.length ? "" : `<p class="libEmpty">No bookmarks yet. Press <b>☆ Bookmark</b> under the picture to save the pattern you're looking at, with a snapshot.</p>`;
+  L.forEach((e) => {
+    const card = document.createElement("figure"); card.className = "libCard";
+    const shot = typeof e.thumb === "string" && e.thumb.startsWith("data:image/") ? Object.assign(document.createElement("img"), { src: e.thumb, alt: "Snapshot of the pattern" }) : Object.assign(document.createElement("div"), { className: "noshot", textContent: "no snapshot" });
+    shot.title = "Open this pattern"; shot.addEventListener("click", () => libOpen(e));
+    const body = document.createElement("figcaption"); body.className = "lb";
+    const name = Object.assign(document.createElement("input"), { value: String(e.name || ""), spellcheck: false });
+    name.setAttribute("aria-label", "Bookmark name");
+    name.placeholder = "Untitled";
+    name.addEventListener("change", () => { const M = libLoad(), x = M.find((y) => y.id === e.id); if (x) { x.name = name.value.trim().slice(0, 60) || (/^Untitled \d+$/.test(x.name) ? x.name : untitled(M, e.id)); name.value = x.name; e.name = x.name; libSave(M); } });
+    const code = Object.assign(document.createElement("div"), { className: "lc", textContent: String(e.input || "") });
+    code.title = String(e.input || "");
+    const when = Object.assign(document.createElement("div"), { className: "ld", textContent: `day ${Number(e.day) || 0} · ${new Date(e.when || Date.now()).toLocaleDateString()}` });
+    const acts = document.createElement("div"); acts.className = "la";
+    const btn = (label, fn) => { const b = Object.assign(document.createElement("button"), { type: "button", textContent: label }); b.addEventListener("click", fn); acts.append(b); };
+    btn("Open", () => libOpen(e));
+    btn("Copy link", () => { const url = location.origin + location.pathname + "#in=" + encodeURIComponent(e.input); try { navigator.clipboard.writeText(url).then(() => ptoast("Link copied"), () => ptoast(url)); } catch { ptoast(url); } });
+    btn("Delete", () => { if (!confirm(`Delete the bookmark "${e.name}"?`)) return; libSave(libLoad().filter((y) => y.id !== e.id)); libRender(); });
+    body.append(name, code, when, acts);
+    card.append(shot, body); G.append(card);
+  });
+}
+$("libB").addEventListener("click", (ev) => { ev.preventDefault(); libRender(); $("lib").hidden = false; $("libClose").focus(); });
+$("libClose").addEventListener("click", () => ($("lib").hidden = true));
+$("lib").addEventListener("click", (ev) => { if (ev.target === $("lib")) $("lib").hidden = true; });   // a click outside the panel
+$("libExport").addEventListener("click", () => {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(libLoad())], { type: "application/json" }));
+  a.download = "peener-library.json"; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("libImport").addEventListener("change", async () => {
+  const file = $("libImport").files[0]; $("libImport").value = ""; if (!file) return;
+  let got; try { got = JSON.parse(await file.text()); } catch { ptoast("That file isn't a Peener library"); return; }
+  if (!Array.isArray(got)) { ptoast("That file isn't a Peener library"); return; }
+  const L = libLoad(), have = new Set(L.map((x) => x.id)); let added = 0;
+  for (const x of got) if (x && typeof x.input === "string" && x.input.trim() && !have.has(x.id)) {
+    L.push({ id: String(x.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), name: String(x.name || untitled(L)).slice(0, 60), input: x.input, day: Number(x.day) || 0,
+      box: Array.isArray(x.box) && x.box.length === 4 && x.box.every(Number.isFinite) ? x.box : null,
+      paint: Number(x.paint) || 0, dots: Number(x.dots) || 1200, formula: String(x.formula || "").slice(0, 2000), when: Number(x.when) || Date.now(), thumb: typeof x.thumb === "string" && x.thumb.startsWith("data:image/") ? x.thumb : null });
+    added++;
+  }
+  if (!libSave(L)) { ptoast("Not enough room in this browser for those bookmarks"); return; }
+  libRender(); ptoast(`Added ${added} bookmark${added === 1 ? "" : "s"}`);
+});
 buildArt();
 run();
 </script>
