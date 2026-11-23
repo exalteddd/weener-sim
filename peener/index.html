@@ -148,6 +148,13 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
   #unit { font-size: 14px; } #credit { font-size: 15px; }
   #poly { font-size: 21px; } #fnmeta { font-size: 18px; gap: 12px; } #fnmeta .vr { height: 22px; }
   #counts { font-size: 15px; } #counts th { padding: 3px 14px 3px 4px; } #counts td { padding: 3px 8px; min-width: 2.6em; }
+  /* phones: the header wraps instead of overlapping, the formula wraps instead of running off the edge,
+     and the painting's box takes the painting's own shape instead of 60% of the screen height */
+  #head { flex-wrap: wrap; row-gap: 4px; } #title { flex: 1 0 100%; } #openB { margin-left: auto; }   /* the two links share a row under the title */
+  #poly { white-space: normal; overflow: visible; line-height: 1.55; }
+  #fnmeta { flex-wrap: wrap; justify-content: center; text-align: center; gap: 2px 12px; } #fnmeta .vr { display: none; } #stab { white-space: nowrap; }
+  body { grid-template-rows: auto auto auto auto auto auto auto auto; }
+  #stage { height: auto; min-height: 0; aspect-ratio: var(--ar, 4 / 3); }
 }
 
 /* loading screen: the painting grows out of the centre as a dot pattern while the real painting downloads */
@@ -177,11 +184,11 @@ input[type="checkbox"] { accent-color: var(--red); width: 22px; height: 22px; ma
 <form id="bar" autocomplete="off">
   <div id="head">
     <div id="title"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="8.0" cy="4.0" r="3.3" fill="#6c84c8"/><circle cx="16.0" cy="4.0" r="3.3" fill="#7480c6"/><circle cx="24.0" cy="4.0" r="3.3" fill="#7480c6"/><circle cx="8.0" cy="12.0" r="3.3" fill="#7480c6"/><circle cx="32.0" cy="12.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="20.0" r="3.3" fill="#3d4787"/><circle cx="16.0" cy="20.0" r="3.3" fill="#7c7cc3"/><circle cx="24.0" cy="20.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="28.0" r="3.3" fill="#7c7cc3"/><circle cx="8.0" cy="36.0" r="3.3" fill="#7c7cc3"/></svg><span class="sep"></span><a id="toWeener" href="#" title="Reload Peener Sim"><h1>Peener Sim</h1></a></div>
-    <a id="openB" href="builder/" target="_blank" rel="noopener">Ween builder ↗</a><a id="openW" href="../" target="_blank" rel="noopener">Open Weener Sim ↗</a>
+    <a id="openB" href="builder/" target="_blank" rel="noopener">Ween builder ↗&#xFE0E;</a><a id="openW" href="../" target="_blank" rel="noopener">Open Weener Sim ↗&#xFE0E;</a>
   </div>
   <div id="inrow">
   <input id="inp" spellcheck="false" aria-label="Vectors" value="(-45,64) (64,-45) (-34,-34) (-49,-67)">
-<details id="help"><summary>Inputs ↗</summary><ul>
+<details id="help"><summary>Inputs ↗&#xFE0E;</summary><ul>
     <li class="exh">Types of inputs accepted</li>
     <li><code>(3,1) (0,2)</code> or <code>3,1 0,2</code> points</li>
     <li><code>(1/2,1/2) (0.5,-1)</code> fractions: only sums landing on whole-number points count</li>
@@ -1277,6 +1284,7 @@ async function buildArt() {
   const cg = cv.getContext("2d", { willReadFrequently: true }); cg.imageSmoothingQuality = "high"; cg.drawImage(src, sx, sy, sw, sh, 0, 0, N, M);
   const comp = cg.getImageData(0, 0, N, M);
   pic = { N, M, cx: Math.floor(N / 2), cy: Math.floor(M / 2), cv, cg, comp, base: new Uint8ClampedArray(comp.data) };
+  if (!bigPts) $("stage").style.setProperty("--ar", `${N} / ${M}`);   // phones size the picture box to the painting
   Loader.set(0.62, "Finding which points each day reaches");
   // while the loading screen is up, fetch the other paintings too, so switching later is instant
   if (!buildArt.prefetched) {
@@ -2153,6 +2161,7 @@ function polyBig(r) {
 const mapOn = () => $("mapOn").checked;
 let fastRes = null, bigPts = null;
 function setMapUI() {
+  $("stage").style.setProperty("--ar", bigPts ? "1 / 1" : pic ? `${pic.N} / ${pic.M}` : "4 / 3");   // used on phones
   document.body.classList.toggle("nomap", !mapOn());
   document.body.classList.toggle("bigmap", mapOn() && !!bigPts);
 }
