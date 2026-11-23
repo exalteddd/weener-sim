@@ -3365,10 +3365,10 @@ const formulaText = () => ["poly", "wpoly"].filter((id) => !$(id).hidden).map((i
 const untitled = (L, skip) => { let k = 0; for (const e of L) { const m = e.id !== skip && /^Untitled (\d+)$/.exec(String(e.name || "")); if (m) k = Math.max(k, Number(m[1])); } return `Untitled ${k + 1}`; };
 // the map for what's on screen now (not the last input's, still up while the new one is searched)
 const reachNow = () => reach && reach.pic === pic && reach.groups === forGroups;
-// The library picture: the pattern on day 50, or on the first day 80% of the grid is filled if that comes sooner,
+// The library picture: the pattern on day 50, or on the first day 10% of the grid is filled if that comes sooner,
 // cropped round the dots it has reached by then (and its walls) so a small pattern fills the card. It is drawn off
 // screen: the picture you're looking at keeps its day and zoom.
-const SNAP_DAY = 50, SNAP_FILL = 0.8;
+const SNAP_DAY = 50, SNAP_FILL = 0.1;
 async function wallpaper() {
   if (!mapOn() || bigPts || !pic) return { thumb: snapshot(), day: cur };
   for (const t0 = Date.now(); Date.now() - t0 < 20000 && !(reachNow() && (reach.done || reach.maxDay >= SNAP_DAY)); ) await new Promise((r) => setTimeout(r, 150));
@@ -3413,7 +3413,7 @@ $("bookB").addEventListener("click", () => {
   const input = $("inp").value.trim(); if (!input) { ptoast("Type a pattern first"); return; }
   $("bkName").value = ""; $("bkName").placeholder = untitled(libLoad()); $("bkCode").textContent = input;
   $("bkNote").textContent = !mapOn() ? "The map is off, so this bookmark gets no picture. Turn on Map to save one."
-    : bigPts ? "Its picture in the library is the picture as it looks now." : "Its picture in the library is the pattern on day 50, or sooner if it fills 80% of the grid first.";
+    : bigPts ? "Its picture in the library is the picture as it looks now." : "Its picture in the library is the pattern on day 50, or sooner if it fills 10% of the grid first.";
   $("bk").hidden = false; $("bkName").focus();
 });
 $("bkCancel").addEventListener("click", () => ($("bk").hidden = true));
